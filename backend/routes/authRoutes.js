@@ -48,11 +48,10 @@ router.get('/google/callback',
       domain: process.env.COOKIE_DOMAIN || undefined 
     };
 
-    // Redirect to frontend with cookies
     res
       .cookie('token', token, options)
       .cookie('tenantId', req.user.tenantId, options)
-      .redirect(process.env.CLIENT_URL + '/dashboard');
+      .redirect(`${process.env.CLIENT_URL}/dashboard?token=${token}&tenantId=${req.user.tenantId}&userId=${req.user.id}`);
   }
 );
 

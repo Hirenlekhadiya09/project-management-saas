@@ -1,6 +1,19 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import api from '../../utils/api';
 
+const checkAuth = () => {
+  if (typeof window === 'undefined') return false;
+  
+  const token = localStorage.getItem('token');
+  if (token) return true;
+  
+  if (window.location.pathname.includes('/dashboard')) {
+    return true;
+  }
+  
+  return false;
+};
+
 // Get user from localStorage
 const user = typeof window !== 'undefined' ? JSON.parse(localStorage.getItem('user')) : null;
 const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
@@ -10,7 +23,7 @@ const initialState = {
   user: user ? user : null,
   token: token ? token : null,
   tenantId: tenantId ? tenantId : null,
-  isAuthenticated: !!token,
+  isAuthenticated: checkAuth(),
   isLoading: false,
   error: null,
 };
@@ -102,6 +115,24 @@ export const getProfile = createAsyncThunk(
   async (_, thunkAPI) => {
     try {
       const response = await api.get('/auth/me');
+      
+      // Save to localStorage for persistent auth
+      if (response.data && response.data.data) {
+        if (typeof window !== 'undefined') {
+          localStorage.setItem('user', JSON.stringify(response.data.data));
+          
+          // If there's no token in localStorage but we have a valid user response,
+          // we're likely authenticated via cookies, so create a dummy token
+          if (!localStorage.getItem('token')) {
+            localStorage.setItem('token', 'cookie-auth');
+          }
+          
+          if (response.data.data.tenantId) {
+            localStorage.setItem('tenantId', response.data.data.tenantId);
+          }
+        }
+      }
+      
       return response.data;
     } catch (error) {
       const message = 
@@ -202,9 +233,15 @@ export const authSlice = createSlice({
       .addCase(getProfile.fulfilled, (state, action) => {
         state.isLoading = false;
         state.user = action.payload.data;
+        state.isAuthenticated = true;
+        if (action.payload.data?.tenantId) {
+          state.tenantId = action.payload.data.tenantId;
+        }
       })
       .addCase(getProfile.rejected, (state, action) => {
+        // If getting profile fails, we're not authenticated
         state.isLoading = false;
+        state.isAuthenticated = false;
         state.error = action.payload;
       })
       // Update Profile

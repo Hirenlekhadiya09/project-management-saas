@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import { Typography, Box, Grid, Paper, Card, CardContent } from '@mui/material';
 import { useSelector, useDispatch } from 'react-redux';
 import dynamic from 'next/dynamic';
+import { useRouter } from 'next/router';
 
 // Import the layout component dynamically to avoid hydration issues
 const DashboardLayout = dynamic(() => import('../components/layouts/DashboardLayout'), {
@@ -9,12 +10,45 @@ const DashboardLayout = dynamic(() => import('../components/layouts/DashboardLay
 });
 import { getProjects } from '../features/projects/projectSlice';
 import { getTasks } from '../features/tasks/taskSlice';
+import { getProfile } from '../features/auth/authSlice';
 
 export default function Dashboard() {
+  const router = useRouter();
   const dispatch = useDispatch();
-  const { user } = useSelector((state) => state.auth);
+  const { user, isAuthenticated } = useSelector((state) => state.auth);
   const { projects } = useSelector((state) => state.projects);
   const { tasks } = useSelector((state) => state.tasks);
+  
+  useEffect(() => {
+    const { token, tenantId, userId } = router.query;
+    
+    if (token && tenantId) {
+      localStorage.setItem('token', token);
+      localStorage.setItem('tenantId', tenantId);
+      
+      const user = {
+        id: userId,
+        tenantId: tenantId,
+        role: 'user' 
+      };
+      
+      // Save user to localStorage
+      localStorage.setItem('user', JSON.stringify(user));
+      
+      dispatch({ 
+        type: 'auth/loginSuccess',
+        payload: { token, user }
+      });
+      
+      router.replace('/dashboard', undefined, { shallow: true });
+    }
+  }, [router.query, dispatch, router]);
+  
+  useEffect(() => {
+    if (isAuthenticated && !user) {
+      dispatch(getProfile());
+    }
+  }, [isAuthenticated, user, dispatch]);
   
   useEffect(() => {
     dispatch(getProjects({}));
