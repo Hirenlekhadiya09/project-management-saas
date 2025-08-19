@@ -43,7 +43,9 @@ router.get('/google/callback',
         Date.now() + process.env.JWT_COOKIE_EXPIRE * 24 * 60 * 60 * 1000
       ),
       httpOnly: true,
-      secure: process.env.NODE_ENV === 'production'
+      secure: true, 
+      sameSite: 'none', 
+      domain: process.env.COOKIE_DOMAIN || undefined 
     };
 
     // Redirect to frontend with cookies

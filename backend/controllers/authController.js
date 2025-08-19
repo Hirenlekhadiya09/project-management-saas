@@ -331,12 +331,13 @@ const sendTokenResponse = (user, statusCode, res) => {
     ),
     httpOnly: true,
     path: '/',
-    sameSite: 'lax'  // Change to lax to allow cross-site requests
+    secure: true, 
+    sameSite: 'none' 
   };
 
-  // Use secure flag in production
-  if (process.env.NODE_ENV === 'production') {
-    options.secure = true;
+  // If we're on Render and COOKIE_DOMAIN is set, use it for cross-domain cookies
+  if (process.env.COOKIE_DOMAIN) {
+    options.domain = process.env.COOKIE_DOMAIN;
   }
 
   // Remove password from output
