@@ -287,11 +287,15 @@ exports.inviteUser = async (req, res) => {
       ${process.env.CLIENT_URL}/login?email=${encodeURIComponent(email)}&tenantId=${req.user.tenantId}
     `;
 
-    await sendEmail({
-      email,
-      subject: `Invitation to join ${tenant.name}`,
-      message
-    });
+    try {
+      await sendEmail({
+        email,
+        subject: `Invitation to join ${tenant.name}`,
+        message
+      });
+    } catch (emailError) {
+      console.error('Email sending failed:', emailError);
+    }
 
     // Add a status field to indicate this is an invited user
     newUser.status = 'Invited';
