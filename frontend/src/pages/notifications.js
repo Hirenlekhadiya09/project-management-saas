@@ -27,7 +27,7 @@ import {
   Task as TaskIcon,
   Person as PersonIcon,
   Notifications as NotificationsIcon,
-  Project as ProjectIcon,
+  Folder as ProjectIcon, 
   Delete as DeleteIcon,
   CheckCircle as CheckCircleIcon,
 } from '@mui/icons-material';
