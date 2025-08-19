@@ -2,16 +2,21 @@ const nodemailer = require('nodemailer');
 
 const sendEmail = async (options) => {
   try {
-    // Create a transporter
-    const transporter = nodemailer.createTransport({
-      host: process.env.SMTP_HOST,
-      port: process.env.SMTP_PORT,
+    // Gmail-specific configuration for better compatibility with Render
+    const transportConfig = {
+      service: 'gmail',
       auth: {
         user: process.env.SMTP_EMAIL,
         pass: process.env.SMTP_PASSWORD
       },
-      secure: process.env.SMTP_PORT === '465', 
-    });
+      tls: {
+        rejectUnauthorized: false // Helps with certain Render deployments
+      },
+      debug: true, // Enable for troubleshooting, can be removed in production
+    };
+    
+    // Create a transporter with Gmail-specific settings
+    const transporter = nodemailer.createTransport(transportConfig);
 
     // Message object
     const message = {
