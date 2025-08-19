@@ -21,7 +21,12 @@ api.interceptors.request.use(
       config.headers['x-tenant-id'] = tenantId;
     }
     
-    config.withCredentials = true;
+    const token = localStorage.getItem('token');
+    if (token) {
+      config.headers['Authorization'] = `Bearer ${token}`;
+    }
+    
+    config.withCredentials = false;
     
     return config;
   },

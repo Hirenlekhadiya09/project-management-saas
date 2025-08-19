@@ -33,34 +33,12 @@ router.get('/google', passport.authenticate('google', { scope: ['profile', 'emai
 router.get('/google/callback', 
   passport.authenticate('google', { failureRedirect: process.env.CLIENT_URL + '/login?error=Google authentication failed' }), 
   (req, res) => {
-    // Create and set token cookies
     const token = jwt.sign({ id: req.user.id }, process.env.JWT_SECRET, {
       expiresIn: process.env.JWT_EXPIRE
     });
 
-    const options = {
-      expires: new Date(
-        Date.now() + process.env.JWT_COOKIE_EXPIRE * 24 * 60 * 60 * 1000
-      ),
-      httpOnly: true,
-      secure: true, 
-      sameSite: 'none', 
-      domain: process.env.COOKIE_DOMAIN || undefined 
-    };
-
-    // Add non-httpOnly cookies for frontend access in cross-domain scenarios
-    const clientSideCookieOptions = {
-      ...options,
-      httpOnly: false
-    };
-
-    // Redirect to frontend with both httpOnly and non-httpOnly cookies, plus URL parameters as fallback
-    res
-      .cookie('token', token, options) // HTTP-only for security
-      .cookie('tenantId', req.user.tenantId, options)
-      .cookie('auth_token', token, clientSideCookieOptions) // Client-accessible for cross-domain issues
-      .cookie('auth_tenant', req.user.tenantId, clientSideCookieOptions)
-      .redirect(`${process.env.CLIENT_URL}/dashboard?token=${token}&tenantId=${req.user.tenantId}&userId=${req.user.id}`);
+    // Simple approach - just redirect with URL parameters
+    res.redirect(`${process.env.CLIENT_URL}/dashboard?token=${token}&tenantId=${req.user.tenantId}&userId=${req.user.id}&name=${encodeURIComponent(req.user.name)}&email=${encodeURIComponent(req.user.email)}&role=${req.user.role || 'user'}`);
   }
 );
 

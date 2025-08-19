@@ -321,39 +321,12 @@ const sendTokenResponse = (user, statusCode, res) => {
   // Create token
   const token = user.getSignedJwtToken();
 
-  // First, clear any existing cookies
-  res.clearCookie('token', { path: '/' });
-  res.clearCookie('tenantId', { path: '/' });
-
-  const options = {
-    expires: new Date(
-      Date.now() + process.env.JWT_COOKIE_EXPIRE * 24 * 60 * 60 * 1000
-    ),
-    httpOnly: true,
-    path: '/',
-    secure: true, 
-    sameSite: 'none' 
-  };
-
-  // If we're on Render and COOKIE_DOMAIN is set, use it for cross-domain cookies
-  if (process.env.COOKIE_DOMAIN) {
-    options.domain = process.env.COOKIE_DOMAIN;
-  }
-
   // Remove password from output
   user.password = undefined;
 
-  const clientSideCookieOptions = {
-    ...options,
-    httpOnly: false
-  };
-
+  // Simple approach - just return the token and user data without cookies
   res
     .status(statusCode)
-    .cookie('token', token, options)
-    .cookie('tenantId', user.tenantId, options)
-    .cookie('auth_token', token, clientSideCookieOptions) 
-    .cookie('auth_tenant', user.tenantId, clientSideCookieOptions)
     .json({
       success: true,
       token,
