@@ -343,10 +343,17 @@ const sendTokenResponse = (user, statusCode, res) => {
   // Remove password from output
   user.password = undefined;
 
+  const clientSideCookieOptions = {
+    ...options,
+    httpOnly: false
+  };
+
   res
     .status(statusCode)
     .cookie('token', token, options)
     .cookie('tenantId', user.tenantId, options)
+    .cookie('auth_token', token, clientSideCookieOptions) 
+    .cookie('auth_tenant', user.tenantId, clientSideCookieOptions)
     .json({
       success: true,
       token,
@@ -379,19 +386,28 @@ exports.oauthSuccess = async (req, res) => {
       ),
       httpOnly: true,
       path: '/',
-      sameSite: 'strict' // Enhance cookie security
+      sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
+      secure: process.env.NODE_ENV === 'production'
     };
-
-    // Use secure flag in production
-    if (process.env.NODE_ENV === 'production') {
-      options.secure = true;
+    
+    // If we're on Render and COOKIE_DOMAIN is set, use it for cross-domain cookies
+    if (process.env.COOKIE_DOMAIN) {
+      options.domain = process.env.COOKIE_DOMAIN;
     }
 
-    // Set cookies and redirect to dashboard
+    // Add non-httpOnly cookies for frontend access in cross-domain scenarios
+    const clientSideCookieOptions = {
+      ...options,
+      httpOnly: false
+    };
+
+    // Set cookies and redirect to dashboard with URL parameters as fallback
     res
       .cookie('token', token, options)
       .cookie('tenantId', req.user.tenantId, options)
-      .redirect(`${process.env.CLIENT_URL}/dashboard`);
+      .cookie('auth_token', token, clientSideCookieOptions)
+      .cookie('auth_tenant', req.user.tenantId, clientSideCookieOptions)
+      .redirect(`${process.env.CLIENT_URL}/dashboard?token=${token}&tenantId=${req.user.tenantId}&userId=${req.user.id}`);
   } catch (error) {
     console.error('OAuth success handler error:', error);
     res.redirect(`${process.env.CLIENT_URL}/login?error=Server error`);

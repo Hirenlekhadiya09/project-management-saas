@@ -48,9 +48,18 @@ router.get('/google/callback',
       domain: process.env.COOKIE_DOMAIN || undefined 
     };
 
+    // Add non-httpOnly cookies for frontend access in cross-domain scenarios
+    const clientSideCookieOptions = {
+      ...options,
+      httpOnly: false
+    };
+
+    // Redirect to frontend with both httpOnly and non-httpOnly cookies, plus URL parameters as fallback
     res
-      .cookie('token', token, options)
+      .cookie('token', token, options) // HTTP-only for security
       .cookie('tenantId', req.user.tenantId, options)
+      .cookie('auth_token', token, clientSideCookieOptions) // Client-accessible for cross-domain issues
+      .cookie('auth_tenant', req.user.tenantId, clientSideCookieOptions)
       .redirect(`${process.env.CLIENT_URL}/dashboard?token=${token}&tenantId=${req.user.tenantId}&userId=${req.user.id}`);
   }
 );

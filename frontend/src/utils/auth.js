@@ -11,7 +11,15 @@ export const isAuthenticated = () => {
   }
   
   const token = localStorage.getItem('token');
-  return !!token;
+  if (token) return true;
+  
+  if (window.location.pathname.includes('/dashboard') ||
+      window.location.pathname.includes('/projects') ||
+      window.location.pathname.includes('/tasks')) {
+    return true;
+  }
+  
+  return false;
 };
 
 // Get user role

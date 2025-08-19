@@ -62,10 +62,20 @@ const corsOptions = {
     const allowedOrigins = [
       process.env.CLIENT_URL || 'http://localhost:3000',
       'http://localhost:3000',
-      'http://127.0.0.1:3000'
+      'http://127.0.0.1:3000',
+      /\.onrender\.com$/  
     ];
     
-    if (allowedOrigins.indexOf(origin) !== -1 || process.env.NODE_ENV === 'development') {
+    const isAllowed = allowedOrigins.some(allowedOrigin => {
+      if (typeof allowedOrigin === 'string') {
+        return allowedOrigin === origin;
+      } else if (allowedOrigin instanceof RegExp) {
+        return allowedOrigin.test(origin);
+      }
+      return false;
+    });
+    
+    if (isAllowed || process.env.NODE_ENV === 'development') {
       callback(null, true);
     } else {
       callback(new Error('Not allowed by CORS'));
@@ -86,7 +96,11 @@ app.use(session({
   secret: process.env.SESSION_SECRET || 'keyboard cat',
   resave: false,
   saveUninitialized: false,
-  cookie: { secure: process.env.NODE_ENV === 'production' }
+  cookie: { 
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
+    maxAge: 24 * 60 * 60 * 1000 // 24 hours
+  }
 }));
 
 app.use(passport.initialize());

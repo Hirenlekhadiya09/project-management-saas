@@ -34,6 +34,34 @@ export default function Login() {
   const { isLoading, isAuthenticated, error } = useSelector((state) => state.auth);
   
   useEffect(() => {
+    const getCookie = (name) => {
+      if (typeof document === 'undefined') return null;
+      const value = `; ${document.cookie}`;
+      const parts = value.split(`; ${name}=`);
+      if (parts.length === 2) return parts.pop().split(';').shift();
+      return null;
+    };
+    
+    const cookieToken = getCookie('auth_token');
+    const cookieTenantId = getCookie('auth_tenant');
+    
+    if (cookieToken && cookieTenantId && !isAuthenticated) {
+      localStorage.setItem('token', cookieToken);
+      localStorage.setItem('tenantId', cookieTenantId);
+      
+      dispatch({ 
+        type: 'auth/loginSuccess',
+        payload: { 
+          token: cookieToken,
+          user: { tenantId: cookieTenantId }
+        }
+      });
+      
+      // Redirect to dashboard
+      router.push('/dashboard');
+      return;
+    }
+    
     // Redirect if already logged in
     if (isAuthenticated) {
       router.push('/dashboard');

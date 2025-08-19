@@ -20,6 +20,9 @@ api.interceptors.request.use(
     if (tenantId) {
       config.headers['x-tenant-id'] = tenantId;
     }
+    
+    config.withCredentials = true;
+    
     return config;
   },
   (error) => {

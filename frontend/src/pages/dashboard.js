@@ -20,6 +20,14 @@ export default function Dashboard() {
   const { tasks } = useSelector((state) => state.tasks);
   
   useEffect(() => {
+    const getCookie = (name) => {
+      if (typeof document === 'undefined') return null;
+      const value = `; ${document.cookie}`;
+      const parts = value.split(`; ${name}=`);
+      if (parts.length === 2) return parts.pop().split(';').shift();
+      return null;
+    };
+    
     const { token, tenantId, userId } = router.query;
     
     if (token && tenantId) {
@@ -32,7 +40,6 @@ export default function Dashboard() {
         role: 'user' 
       };
       
-      // Save user to localStorage
       localStorage.setItem('user', JSON.stringify(user));
       
       dispatch({ 
@@ -40,7 +47,30 @@ export default function Dashboard() {
         payload: { token, user }
       });
       
+      // Clean up the URL without the parameters
       router.replace('/dashboard', undefined, { shallow: true });
+    } 
+    // If no URL parameters, check for cookies as fallback
+    else if (!localStorage.getItem('token')) {
+      const cookieToken = getCookie('auth_token');
+      const cookieTenantId = getCookie('auth_tenant');
+      
+      if (cookieToken && cookieTenantId) {
+        localStorage.setItem('token', cookieToken);
+        localStorage.setItem('tenantId', cookieTenantId);
+        
+        // We'll need to fetch the full user profile
+        dispatch(getProfile());
+        
+        // Update authentication state
+        dispatch({ 
+          type: 'auth/loginSuccess',
+          payload: { 
+            token: cookieToken,
+            user: { tenantId: cookieTenantId }
+          }
+        });
+      }
     }
   }, [router.query, dispatch, router]);
   

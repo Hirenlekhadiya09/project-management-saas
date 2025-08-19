@@ -4,12 +4,25 @@ import api from '../../utils/api';
 const checkAuth = () => {
   if (typeof window === 'undefined') return false;
   
+  // Check localStorage first (our primary method)
   const token = localStorage.getItem('token');
   if (token) return true;
   
-  if (window.location.pathname.includes('/dashboard')) {
+  if (window.location.pathname.includes('/dashboard') && 
+      (window.location.search.includes('token=') || 
+       window.location.search.includes('tenantId='))) {
     return true;
   }
+  
+  const getCookie = (name) => {
+    const value = `; ${document.cookie}`;
+    const parts = value.split(`; ${name}=`);
+    if (parts.length === 2) return parts.pop().split(';').shift();
+    return null;
+  };
+  
+  const cookieToken = getCookie('auth_token');
+  if (cookieToken) return true;
   
   return false;
 };
