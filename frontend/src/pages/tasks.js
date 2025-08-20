@@ -35,6 +35,7 @@ import {
   Menu,
   Avatar,
   Alert,
+  Snackbar,
 } from '@mui/material';
 import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
@@ -66,6 +67,12 @@ export default function Tasks() {
   const { tasks, isLoading, error } = useSelector((state) => state.tasks);
   const { projects } = useSelector((state) => state.projects);
   const { user } = useSelector((state) => state.auth);
+  
+  const [snackbar, setSnackbar] = useState({
+    open: false,
+    message: '',
+    severity: 'success'
+  });
   
   const [openTaskDialog, setOpenTaskDialog] = useState(false);
   const [selectedTask, setSelectedTask] = useState(null);
@@ -155,15 +162,48 @@ export default function Tasks() {
     if (selectedTask) {
       dispatch(updateTask({ taskId: selectedTask._id, taskData: taskForm }));
       handleCloseTaskDialog();
+      
+      const message = user?.role === 'admin' 
+        ? `Admin action: Task "${taskForm.title}" has been updated`
+        : `Task "${taskForm.title}" has been updated`;
+      
+      setSnackbar({
+        open: true,
+        message,
+        severity: 'info'
+      });
     } else {
       dispatch(createTask(taskForm));
       handleCloseTaskDialog();
+      
+      const message = user?.role === 'admin' 
+        ? `Admin action: New task "${taskForm.title}" has been created`
+        : `New task "${taskForm.title}" has been created`;
+      
+      setSnackbar({
+        open: true,
+        message,
+        severity: 'success'
+      });
     }
   };
   
   const handleDeleteTask = (taskId) => {
+    const task = tasks.find(t => t._id === taskId);
+    const taskName = task ? task.title : 'Task';
+    
     dispatch(deleteTask(taskId));
     handleCloseMenu();
+    
+    const message = user?.role === 'admin'
+      ? `Admin action: Task "${taskName}" has been deleted`
+      : `Task "${taskName}" has been deleted`;
+    
+    setSnackbar({
+      open: true,
+      message,
+      severity: 'warning'
+    });
   };
   
   const handleOpenMenu = (event, taskId) => {
@@ -181,6 +221,23 @@ export default function Tasks() {
   const handleUpdateTaskStatus = (taskId, newStatus) => {
     // We don't need to map status here as it's handled in the updateTask thunk
     dispatch(updateTask({ taskId, taskData: { status: newStatus } }));
+    
+    const task = tasks.find(t => t._id === taskId);
+    const taskName = task ? task.title : 'Task';
+    
+    if (user?.role === 'admin') {
+      setSnackbar({
+        open: true,
+        message: `Admin action: ${taskName} has been marked as ${newStatus}`,
+        severity: 'success'
+      });
+    } else {
+      setSnackbar({
+        open: true,
+        message: `${taskName} has been marked as ${newStatus}`,
+        severity: 'success'
+      });
+    }
   };
   
   const handleFilterChange = (filter) => {
@@ -191,6 +248,13 @@ export default function Tasks() {
     if (taskFilter === 'all') return tasks;
     if (taskFilter === 'my') return tasks.filter(task => task.assignee === user?._id);
     return tasks.filter(task => task.status === taskFilter);
+  };
+  
+  const handleCloseSnackbar = (event, reason) => {
+    if (reason === 'clickaway') {
+      return;
+    }
+    setSnackbar({...snackbar, open: false});
   };
   
   const filteredTasks = getFilteredTasks();
@@ -464,6 +528,23 @@ export default function Tasks() {
           </MenuItem>
         )}
       </Menu>
+      
+      {/* Notification Snackbar */}
+      <Snackbar
+        open={snackbar.open}
+        autoHideDuration={6000}
+        onClose={handleCloseSnackbar}
+        anchorOrigin={{ vertical: 'top', horizontal: 'right' }}
+      >
+        <Alert 
+          onClose={handleCloseSnackbar} 
+          severity={snackbar.severity} 
+          sx={{ width: '100%' }}
+          variant="filled"
+        >
+          {snackbar.message}
+        </Alert>
+      </Snackbar>
     </DashboardLayout>
   );
 }
