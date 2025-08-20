@@ -13,6 +13,7 @@ import {
   updateProject,
   deleteProject,
 } from '../features/projects/projectSlice';
+import { getTasks } from '../features/tasks/taskSlice';
 import {
   Box,
   Typography,
@@ -65,7 +66,12 @@ export default function Projects() {
   // Function to calculate progress
   const calculateProgress = (projectId) => {
     if (!tasks) return 0;
-    const projectTasks = tasks.filter(task => task.projectId === projectId);
+    // Check both project._id and project fields to account for different data structures
+    const projectTasks = tasks.filter(task => 
+      (task.projectId === projectId) || 
+      (task.project?._id === projectId) || 
+      (task.project === projectId)
+    );
     if (projectTasks.length === 0) return 0;
     
     const completedTasks = projectTasks.filter(task => task.status === 'Completed').length;
@@ -75,7 +81,12 @@ export default function Projects() {
   // Function to get task count
   const getTasksCount = (projectId) => {
     if (!tasks) return 0;
-    return tasks.filter(task => task.projectId === projectId).length;
+    // Check both project._id and project fields to account for different data structures
+    return tasks.filter(task => 
+      (task.projectId === projectId) || 
+      (task.project?._id === projectId) || 
+      (task.project === projectId)
+    ).length;
   };
   
   // Function to view tasks for a project
@@ -88,7 +99,13 @@ export default function Projects() {
   
   useEffect(() => {
     dispatch(getProjects({}));
+    dispatch(getTasks({})); // Load all tasks to calculate project task counts
   }, [dispatch]);
+  
+  // Debug: Log tasks when they change
+  useEffect(() => {
+    console.log('Tasks available for project cards:', tasks);
+  }, [tasks]);
   
   const handleOpenProjectDialog = (project = null) => {
     if (project) {
