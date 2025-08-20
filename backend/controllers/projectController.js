@@ -67,10 +67,8 @@ exports.getProjects = async (req, res) => {
         $or: [{ manager: req.user.id }, { members: req.user.id }]
       };
     } else {
-      // Team members only see projects they're assigned to
       query = {
-        tenantId: req.user.tenantId,
-        members: req.user.id
+        tenantId: req.user.tenantId
       };
     }
 

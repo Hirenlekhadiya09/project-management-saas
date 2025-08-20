@@ -84,11 +84,16 @@ export default function Tasks() {
   
   useEffect(() => {
     dispatch(getTasks({}));
-    dispatch(getProjects({})); // Load projects when component mounts
+    dispatch(getProjects({})); 
   }, [dispatch]);
+  
+  useEffect(() => {
+    console.log('Available projects:', projects);
+  }, [projects]);
   
   const handleOpenTaskDialog = (task = null) => {
     if (task) {
+      console.log('Opening task for editing:', task);
       setSelectedTask(task);
       setTaskForm({
         title: task.title,
@@ -409,11 +414,17 @@ export default function Tasks() {
                 select
                 required
               >
-                {projects.map((project) => (
-                  <MenuItem key={project._id} value={project._id}>
-                    {project.name}
+                {projects && projects.length > 0 ? (
+                  projects.map((project) => (
+                    <MenuItem key={project._id} value={project._id}>
+                      {project.name}
+                    </MenuItem>
+                  ))
+                ) : (
+                  <MenuItem disabled value="">
+                    No projects available
                   </MenuItem>
-                ))}
+                )}
               </TextField>
             </Grid>
           </Grid>
