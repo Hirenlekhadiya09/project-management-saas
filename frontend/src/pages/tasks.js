@@ -36,6 +36,9 @@ import {
   Avatar,
   Alert,
 } from '@mui/material';
+import { DatePicker } from '@mui/x-date-pickers/DatePicker';
+import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
+import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
 import {
   Add as AddIcon,
   MoreVert as MoreVertIcon,
@@ -73,6 +76,7 @@ export default function Tasks() {
     priority: 'medium',
     projectId: '',
     assignee: '',
+    dueDate: null,
   });
   const [taskFilter, setTaskFilter] = useState('all');
   const [anchorEl, setAnchorEl] = useState(null);
@@ -91,8 +95,9 @@ export default function Tasks() {
         description: task.description,
         status: task.status,
         priority: task.priority,
-        projectId: task.projectId,
-        assignee: task.assignee,
+        projectId: task.project?._id || task.project,
+        assignee: task.assignedTo?._id || task.assignedTo,
+        dueDate: task.dueDate ? new Date(task.dueDate) : null,
       });
     } else {
       setSelectedTask(null);
@@ -103,6 +108,7 @@ export default function Tasks() {
         priority: 'medium',
         projectId: '',
         assignee: user?._id || '',
+        dueDate: null,
       });
     }
     setOpenTaskDialog(true);
@@ -120,6 +126,13 @@ export default function Tasks() {
     });
   };
   
+  const handleDateChange = (date) => {
+    setTaskForm({
+      ...taskForm,
+      dueDate: date,
+    });
+  };
+  
   // Add state for form errors
   const [formError, setFormError] = useState('');
   
@@ -133,7 +146,7 @@ export default function Tasks() {
     }
     
     setFormError(''); // Clear any errors
-    
+        
     if (selectedTask) {
       dispatch(updateTask({ taskId: selectedTask._id, taskData: taskForm }));
       handleCloseTaskDialog();
@@ -149,6 +162,8 @@ export default function Tasks() {
   };
   
   const handleOpenMenu = (event, taskId) => {
+    const task = tasks.find(t => t._id === taskId);
+    
     setAnchorEl(event.currentTarget);
     setMenuTaskId(taskId);
   };
@@ -248,7 +263,7 @@ export default function Tasks() {
                     }
                     title={task.title}
                     subheader={`Project: ${
-                      projects.find(p => p._id === task.projectId)?.name || 'Unknown'
+                      task.project?.name || projects.find(p => p._id === task.project)?.name || 'Unknown'
                     }`}
                   />
                   <CardContent>
@@ -270,10 +285,10 @@ export default function Tasks() {
                     </Box>
                     <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mt: 2 }}>
                       <Typography variant="caption" color="text.secondary">
-                        Due: {new Date(task.dueDate).toLocaleDateString()}
+                        {task.dueDate ? `Due: ${new Date(task.dueDate).toLocaleDateString()}` : 'No due date set'}
                       </Typography>
                       <Avatar sx={{ width: 30, height: 30 }}>
-                        {task.assigneeName ? task.assigneeName.charAt(0) : 'U'}
+                        {task.assignedTo?.name ? task.assignedTo.name.charAt(0) : 'U'}
                       </Avatar>
                     </Box>
                     {task.status !== 'Completed' && (
@@ -360,6 +375,28 @@ export default function Tasks() {
                 <MenuItem value="high">High</MenuItem>
               </TextField>
             </Grid>
+            <Grid item xs={12} sm={6}>
+              <LocalizationProvider dateAdapter={AdapterDateFns}>
+                <DatePicker
+                  label="Due Date"
+                  value={taskForm.dueDate}
+                  onChange={handleDateChange}
+                  minDate={new Date()} // Disables selection of dates before today
+                  shouldDisableDate={(date) => {
+                    // Additional custom logic if needed
+                    return false;
+                  }}
+                  renderInput={(params) => (
+                    <TextField 
+                      {...params} 
+                      fullWidth 
+                      margin="dense"
+                      helperText="Select a future date"
+                    />
+                  )}
+                />
+              </LocalizationProvider>
+            </Grid>
             <Grid item xs={12}>
               <TextField
                 margin="dense"
@@ -405,13 +442,16 @@ export default function Tasks() {
           <EditIcon fontSize="small" sx={{ mr: 1 }} />
           Edit
         </MenuItem>
-        <MenuItem
-          onClick={() => handleDeleteTask(menuTaskId)}
-          sx={{ color: 'error.main' }}
-        >
-          <DeleteIcon fontSize="small" sx={{ mr: 1 }} />
-          Delete
-        </MenuItem>
+        {/* Only show delete option for admin users and project managers */}
+        {(user?.role === 'admin' || user?.role === 'manager') && (
+          <MenuItem
+            onClick={() => handleDeleteTask(menuTaskId)}
+            sx={{ color: 'error.main' }}
+          >
+            <DeleteIcon fontSize="small" sx={{ mr: 1 }} />
+            Delete
+          </MenuItem>
+        )}
       </Menu>
     </DashboardLayout>
   );
