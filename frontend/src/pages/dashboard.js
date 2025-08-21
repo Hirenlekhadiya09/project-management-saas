@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
 import { Typography, Box, Grid, Paper, Card, CardContent, Chip, Button } from '@mui/material';
+import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import { useSelector, useDispatch } from 'react-redux';
 import dynamic from 'next/dynamic';
 import { useRouter } from 'next/router';
@@ -149,7 +150,20 @@ export default function Dashboard() {
                               right: 8,
                               textTransform: 'capitalize'
                             }}
-                          />                    <Typography variant="subtitle1" sx={{ fontWeight: 'bold', pr: 8 }}>{task.title}</Typography>
+                          />                    <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                      <Typography 
+                        variant="subtitle1" 
+                        sx={{ 
+                          fontWeight: 'bold', 
+                          pr: 1,
+                          textDecoration: task.status === 'done' ? 'line-through' : 'none',
+                          color: task.status === 'done' ? 'text.secondary' : 'text.primary'
+                        }}
+                      >
+                        {task.title}
+                      </Typography>
+                      {task.status === 'done' && <CheckCircleIcon fontSize="small" color="success" />}
+                    </Box>
                     
                     <Box sx={{ display: 'flex', alignItems: 'center', mt: 1 }}>
                       <Chip

@@ -115,7 +115,7 @@ export const createTask = createAsyncThunk(
       };
       
       if (mappedData.status) {
-        mappedData.status = statusMapping.frontendToBackend[mappedData.status] || 'todo';
+        mappedData.status = statusMapping.frontendToBackend[mappedData.status] || mappedData.status;
       }
       
       delete mappedData.projectId;
@@ -144,7 +144,7 @@ export const updateTask = createAsyncThunk(
       };
       
       if (mappedData.status) {
-        mappedData.status = statusMapping.frontendToBackend[mappedData.status] || 'todo';
+        mappedData.status = statusMapping.frontendToBackend[mappedData.status] || mappedData.status;
       }
       
       delete mappedData.projectId;

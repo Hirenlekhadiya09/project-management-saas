@@ -248,26 +248,96 @@ export default function Tasks() {
     setMenuTaskId(null);
   };
   
+  // Add state for confirmation dialog
+  const [confirmDialog, setConfirmDialog] = useState({
+    open: false,
+    taskId: null,
+    taskTitle: '',
+    newStatus: ''
+  });
+  
+  const handleConfirmStatusUpdate = () => {
+    if (!confirmDialog.taskId) return;
+    
+    const taskId = confirmDialog.taskId;
+    const newStatus = confirmDialog.newStatus;
+    
+    // Create update data object
+    const updateData = { 
+      status: newStatus,
+      // No need to change assignee when completing the task
+      // The UI will automatically hide the "Assigned to me" tag based on status
+    };
+    
+    // Dispatch the update action
+    dispatch(updateTask({ taskId, taskData: updateData }));
+    
+    // Show appropriate message based on user role
+    const message = user?.role === 'admin' 
+      ? `Admin action: ${confirmDialog.taskTitle} has been marked as ${newStatus === 'done' ? 'completed' : newStatus}`
+      : `${confirmDialog.taskTitle} has been marked as ${newStatus === 'done' ? 'completed' : newStatus}`;
+    
+    setSnackbar({
+      open: true,
+      message,
+      severity: 'success'
+    });
+    
+    // Close confirmation dialog
+    setConfirmDialog({
+      open: false,
+      taskId: null,
+      taskTitle: '',
+      newStatus: ''
+    });
+    
+    // Refresh tasks after a short delay to ensure server has processed the update
+    setTimeout(() => {
+      const params = projectId ? { project: projectId } : {};
+      if (taskFilter === 'my' || user?.role === 'team_member') {
+        params.myTasks = true;
+      }
+      dispatch(getTasks(params));
+    }, 500);
+  };
+  
   const handleUpdateTaskStatus = (taskId, newStatus) => {
-    // We don't need to map status here as it's handled in the updateTask thunk
-    dispatch(updateTask({ taskId, taskData: { status: newStatus } }));
-    
     const task = tasks.find(t => t._id === taskId);
-    const taskName = task ? task.title : 'Task';
+    const taskTitle = task ? task.title : 'Task';
     
-    if (user?.role === 'admin') {
-      setSnackbar({
+    // Show confirmation dialog for completing tasks
+    if (newStatus === 'done') {
+      setConfirmDialog({
         open: true,
-        message: `Admin action: ${taskName} has been marked as ${newStatus}`,
-        severity: 'success'
+        taskId,
+        taskTitle,
+        newStatus
       });
-    } else {
-      setSnackbar({
-        open: true,
-        message: `${taskName} has been marked as ${newStatus}`,
-        severity: 'success'
-      });
+      return;
     }
+    
+    // For other status updates, proceed directly
+    const updateData = { status: newStatus };
+    dispatch(updateTask({ taskId, taskData: updateData }));
+    
+    const message = user?.role === 'admin' 
+      ? `Admin action: ${taskTitle} status updated to ${newStatus}`
+      : `${taskTitle} status updated to ${newStatus}`;
+    
+    setSnackbar({
+      open: true,
+      message,
+      severity: 'success'
+    });
+    
+    // Refresh tasks after a short delay
+    setTimeout(() => {
+      const params = projectId ? { project: projectId } : {};
+      if (taskFilter === 'my' || user?.role === 'team_member') {
+        params.myTasks = true;
+      }
+      dispatch(getTasks(params));
+    }, 500);
   };
   
   const handleFilterChange = (filter) => {
@@ -407,14 +477,33 @@ export default function Tasks() {
           ) : (
             filteredTasks.map((task) => (
               <Grid item xs={12} md={6} lg={4} key={task._id}>
-                <Card>
+                <Card sx={{ 
+                  opacity: task.status === 'Completed' ? 0.8 : 1,
+                  backgroundColor: task.status === 'Completed' ? '#f8f9fa' : 'white'
+                }}>
                   <CardHeader
                     action={
                       <IconButton onClick={(e) => handleOpenMenu(e, task._id)}>
                         <MoreVertIcon />
                       </IconButton>
                     }
-                    title={task.title}
+                    title={
+                      <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                        <Typography 
+                          variant="subtitle1" 
+                          sx={{ 
+                            textDecoration: task.status === 'Completed' ? 'line-through' : 'none',
+                            color: task.status === 'Completed' ? 'text.secondary' : 'text.primary',
+                            mr: 1
+                          }}
+                        >
+                          {task.title}
+                        </Typography>
+                        {task.status === 'Completed' && (
+                          <CheckCircleIcon fontSize="small" color="success" />
+                        )}
+                      </Box>
+                    }
                     subheader={`Project: ${
                       task.project?.name || projects.find(p => p._id === task.project)?.name || 'Unknown'
                     }`}
@@ -425,8 +514,20 @@ export default function Tasks() {
                     </Typography>
                     <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
                       <Chip
-                        label={task.status}
-                        color={statusColors[task.status]}
+                        label={
+                          task.status === 'todo' ? 'Not Started' :
+                          task.status === 'in-progress' ? 'In Progress' :
+                          task.status === 'review' ? 'Under Review' :
+                          task.status === 'done' ? 'Completed' :
+                          task.status
+                        }
+                        color={
+                          task.status === 'todo' ? 'default' :
+                          task.status === 'in-progress' ? 'primary' :
+                          task.status === 'review' ? 'warning' :
+                          task.status === 'done' ? 'success' :
+                          statusColors[task.status] || 'default'
+                        }
                         size="small"
                         sx={{ mr: 1 }}
                       />
@@ -441,7 +542,9 @@ export default function Tasks() {
                         {task.dueDate ? `Due: ${new Date(task.dueDate).toLocaleDateString()}` : 'No due date set'}
                       </Typography>
                       <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                        {(task.assignedTo?._id === user?._id || task.assignedTo === user?._id) && (
+                        {/* Only show "Assigned to me" if task is assigned to current user AND not completed/done */}
+                        {(task.assignedTo?._id === user?._id || task.assignedTo === user?._id) && 
+                         task.status !== 'Completed' && task.status !== 'done' && (
                           <Chip 
                             label="Assigned to me" 
                             size="small" 
@@ -479,12 +582,12 @@ export default function Tasks() {
                         </Box>
                       </Box>
                     </Box>
-                    {task.status !== 'Completed' && (
+                    {task.status !== 'Completed' && task.status !== 'done' && (
                       <Button
                         fullWidth
                         variant="outlined"
                         startIcon={<CheckCircleIcon />}
-                        onClick={() => handleUpdateTaskStatus(task._id, 'Completed')}
+                        onClick={() => handleUpdateTaskStatus(task._id, 'done')}
                         sx={{ mt: 2 }}
                       >
                         Mark as Completed
@@ -740,6 +843,26 @@ export default function Tasks() {
           {snackbar.message}
         </Alert>
       </Snackbar>
+      
+      {/* Confirmation Dialog for Task Completion */}
+      <Dialog
+        open={confirmDialog.open}
+        onClose={() => setConfirmDialog({...confirmDialog, open: false})}
+      >
+        <DialogTitle>Confirm Task Completion</DialogTitle>
+        <DialogContent>
+          <DialogContentText>
+            Are you sure you want to mark &quot;{confirmDialog.taskTitle}&quot; as completed?
+            This will update the task status for all team members.
+          </DialogContentText>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setConfirmDialog({...confirmDialog, open: false})}>Cancel</Button>
+          <Button onClick={handleConfirmStatusUpdate} variant="contained" color="success" autoFocus>
+            Mark as Completed
+          </Button>
+        </DialogActions>
+      </Dialog>
     </DashboardLayout>
   );
 }

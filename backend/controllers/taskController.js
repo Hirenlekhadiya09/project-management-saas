@@ -352,42 +352,89 @@ The Task Management Team
         // Don't fail the task update if email fails
       }
     } 
-    // If task status changed, notify assigned user (if not the updater)
-    else if (
-      req.body.status && 
-      task.assignedTo && 
-      task.assignedTo._id.toString() !== req.user.id
-    ) {
-      // Create in-app notification
-      await Notification.create({
-        type: 'task_updated',
-        title: 'Task status updated',
-        message: `Task "${task.title}" status changed to ${req.body.status}`,
-        recipient: task.assignedTo._id,
-        sender: req.user.id,
-        relatedResource: {
-          resourceType: 'task',
-          resourceId: task._id
-        },
-        tenantId: req.user.tenantId
-      });
+    // If task status changed, notify relevant users
+    else if (req.body.status) {
+      // Get the status-friendly name
+      const statusMap = {
+        'todo': 'Not Started',
+        'in-progress': 'In Progress',
+        'review': 'Under Review',
+        'done': 'Completed'
+      };
+      const friendlyStatus = statusMap[req.body.status] || req.body.status;
       
-      // Send email notification for status update
-      try {
-        // Get the status-friendly name
-        const statusMap = {
-          'todo': 'Not Started',
-          'in-progress': 'In Progress',
-          'review': 'Under Review',
-          'done': 'Completed'
-        };
-        const friendlyStatus = statusMap[req.body.status] || req.body.status;
+      // If task is marked as completed, notify project manager and assignee (if not the updater)
+      if (req.body.status === 'done' || req.body.status === 'Completed') {
+        // Find project manager to notify them
+        if (project.manager && project.manager.toString() !== req.user.id) {
+          try {
+            const manager = await User.findById(project.manager);
+            
+            // Create in-app notification for project manager
+            await Notification.create({
+              type: 'task_completed',
+              title: 'Task completed',
+              message: `Task "${task.title}" in project "${task.project.name}" has been marked as completed`,
+              recipient: project.manager,
+              sender: req.user.id,
+              relatedResource: {
+                resourceType: 'task',
+                resourceId: task._id
+              },
+              tenantId: req.user.tenantId
+            });
+            
+            // Send email to project manager
+            if (manager && manager.email) {
+              await sendEmail({
+                email: manager.email,
+                subject: `Task Completed: ${task.title}`,
+                message: `
+Hello ${manager.name},
+
+A task in your project has been marked as completed:
+
+Task: ${task.title}
+Project: ${task.project.name}
+Completed by: ${req.user.name}
+Date: ${new Date().toLocaleDateString()}
+
+You can view this task in your dashboard.
+
+Regards,
+The Task Management Team
+                `
+              });
+            }
+          } catch (err) {
+            console.error('Error notifying project manager about completion:', err);
+          }
+        }
+      }
+      
+      // Notify assigned user (if not the updater)
+      if (task.assignedTo && task.assignedTo._id.toString() !== req.user.id) {
+        // Create in-app notification
+        await Notification.create({
+          type: 'task_updated',
+          title: 'Task status updated',
+          message: `Task "${task.title}" status changed to ${friendlyStatus}`,
+          recipient: task.assignedTo._id,
+          sender: req.user.id,
+          relatedResource: {
+            resourceType: 'task',
+            resourceId: task._id
+          },
+          tenantId: req.user.tenantId
+        });
         
-        // Send email to the task assignee
-        await sendEmail({
-          email: task.assignedTo.email,
-          subject: `Task Status Updated: ${task.title}`,
-          message: `
+        // Send email notification for status update
+        try {
+          // Send email to the task assignee
+          await sendEmail({
+            email: task.assignedTo.email,
+            subject: `Task Status Updated: ${task.title}`,
+            message: `
 Hello ${task.assignedTo.name},
 
 The status of your task has been updated:
@@ -400,11 +447,12 @@ You can view this task in your dashboard.
 
 Regards,
 The Task Management Team
-          `
-        });
-      } catch (err) {
-        console.error('Error sending email notification for status update:', err);
-        // Don't fail the task update if email fails
+            `
+          });
+        } catch (err) {
+          console.error('Error sending email notification for status update:', err);
+          // Don't fail the task update if email fails
+        }
       }
     }
 
