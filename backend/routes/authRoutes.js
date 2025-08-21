@@ -37,7 +37,7 @@ router.get('/google/callback',
       expiresIn: process.env.JWT_EXPIRE
     });
 
-    // Set cookies instead of URL parameters
+    // Send both cookies and URL parameters for maximum compatibility
     const cookieOptions = {
       expires: new Date(Date.now() + process.env.JWT_COOKIE_EXPIRE * 24 * 60 * 60 * 1000),
       httpOnly: false,
@@ -53,15 +53,21 @@ router.get('/google/callback',
     // Set cookies
     res.cookie('auth_token', token, cookieOptions);
     res.cookie('auth_tenant', req.user.tenantId, cookieOptions);
-    res.cookie('auth_user', JSON.stringify({
+    
+    // Store full user object in cookie
+    const userForCookie = {
       id: req.user.id,
+      _id: req.user._id,
       name: req.user.name,
       email: req.user.email,
-      role: req.user.role || 'user'
-    }), cookieOptions);
+      role: req.user.role || 'user',
+      tenantId: req.user.tenantId
+    };
     
-    // Redirect to dashboard without query parameters
-    res.redirect(`${process.env.CLIENT_URL}/dashboard`);
+    res.cookie('auth_user', JSON.stringify(userForCookie), cookieOptions);
+    
+    // Also send as URL parameters as a fallback
+    res.redirect(`${process.env.CLIENT_URL}/dashboard?token=${token}&tenantId=${req.user.tenantId}&userId=${req.user.id}&name=${encodeURIComponent(req.user.name)}&email=${encodeURIComponent(req.user.email)}&role=${req.user.role || 'user'}&googleAuth=true`);
   }
 );
 

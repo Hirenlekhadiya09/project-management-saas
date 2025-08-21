@@ -55,10 +55,28 @@ export default function DashboardLayout({ children }) {
   
   // If user is not authenticated, redirect to login
   useEffect(() => {
-    if (!user) {
+    // Check local storage first
+    const token = localStorage.getItem('token');
+    const storedUser = localStorage.getItem('user');
+    
+    // If we have token and user in local storage but not in Redux
+    if (token && storedUser && !user) {
+      try {
+        const parsedUser = JSON.parse(storedUser);
+        // Dispatch login success to restore session
+        dispatch(loginSuccess({ token, user: parsedUser }));
+        return; // Don't redirect yet
+      } catch (e) {
+        console.error('Error parsing stored user data:', e);
+      }
+    }
+    
+    // If no token or no user after restoration attempt, redirect to login
+    if (!token || !user) {
+      console.log('No authentication detected, redirecting to login');
       router.push('/login');
     }
-  }, [user, router]);
+  }, [user, router, dispatch]);
   
   const handleDrawerToggle = () => {
     setMobileOpen(!mobileOpen);
