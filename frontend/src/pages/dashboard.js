@@ -3,7 +3,6 @@ import { Typography, Box, Grid, Paper, Card, CardContent } from '@mui/material';
 import { useSelector, useDispatch } from 'react-redux';
 import dynamic from 'next/dynamic';
 import { useRouter } from 'next/router';
-import { loginSuccess } from '../features/auth/authSlice';
 
 // Import the layout component dynamically to avoid hydration issues
 const DashboardLayout = dynamic(() => import('../components/layouts/DashboardLayout'), {
@@ -21,98 +20,10 @@ export default function Dashboard() {
   const { tasks } = useSelector((state) => state.tasks);
   
   useEffect(() => {
-    // Function to handle auth persistence
-    const persistAuth = (token, userData) => {
-      if (!token || !userData) return false;
-      
-      // Store in localStorage
-      localStorage.setItem('token', token);
-      localStorage.setItem('tenantId', userData.tenantId);
-      localStorage.setItem('user', JSON.stringify(userData));
-      
-      // Update Redux
-      dispatch(loginSuccess({ token, user: userData }));
-      return true;
-    };
-    
-    // Helper function to get cookies
-    const getCookie = (name) => {
-      if (typeof document === 'undefined') return null;
-      const value = `; ${document.cookie}`;
-      const parts = value.split(`; ${name}=`);
-      if (parts.length === 2) return parts.pop().split(';').shift();
-      return null;
-    };
-    
-    const handleAuth = () => {
-      console.log("Dashboard: Checking auth state...");
-      
-      // Try to get authentication from cookies first
-      const cookieToken = getCookie('auth_token');
-      const cookieTenantId = getCookie('auth_tenant');
-      const cookieUser = getCookie('auth_user');
-      
-      if (cookieToken && cookieTenantId) {
-        console.log('Found auth cookies');
-        
-        let userData = { tenantId: cookieTenantId };
-        if (cookieUser) {
-          try {
-            userData = JSON.parse(cookieUser);
-          } catch (e) {
-            console.error('Error parsing user cookie:', e);
-          }
-        }
-        
-        // Store auth data
-        const success = persistAuth(cookieToken, userData);
-        
-        // Clean cookies after consuming them
-        document.cookie = 'auth_token=; Max-Age=0; path=/;';
-        document.cookie = 'auth_tenant=; Max-Age=0; path=/;';
-        document.cookie = 'auth_user=; Max-Age=0; path=/;';
-        
-        if (success) {
-          // Get fresh profile data
-          dispatch(getProfile());
-          return true;
-        }
-      }
-      
-      // Try URL parameters next (from OAuth redirect)
-      const { token, tenantId, userId, name, email, role, googleAuth } = router.query;
-      
-      if (token && tenantId) {
-        console.log('Found URL auth parameters');
-        
-        const userData = {
-          id: userId,
-          _id: userId,
-          tenantId: tenantId,
-          name: name || '',
-          email: email || '',
-          role: role || 'user'
-        };
-        
-        // Store auth data
-        const success = persistAuth(token, userData);
-        
-        if (success) {
-          // Clean up the URL 
-          router.replace('/dashboard', undefined, { shallow: true });
-          
-          // Get fresh profile data
-          dispatch(getProfile());
-          return true;
-        }
-      }
-      
-      return false;
-    };
-    
-    // Try to authenticate from cookies/params
-    handleAuth();
-  }, [dispatch, router]);
+    // Fetch projects and tasks when dashboard loads
+    dispatch(getProjects({}));
+    dispatch(getTasks({ myTasks: true, limit: 5 }));
+  }, [dispatch]);
   
   useEffect(() => {
     if (isAuthenticated && !user) {

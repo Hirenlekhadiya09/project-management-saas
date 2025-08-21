@@ -46,8 +46,15 @@ api.interceptors.response.use(
       originalRequest._retry = true;
       
       if (typeof window !== 'undefined') {
+        console.log('Authentication error detected, redirecting to login');
         localStorage.removeItem('token');
-        window.location.href = '/login';
+        localStorage.removeItem('user');
+        localStorage.removeItem('tenantId');
+        
+        // Use a more graceful navigation
+        if (window.location.pathname !== '/login') {
+          window.location.href = '/login?session=expired';
+        }
       }
     }
     

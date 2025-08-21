@@ -37,37 +37,24 @@ router.get('/google/callback',
       expiresIn: process.env.JWT_EXPIRE
     });
 
-    // Send both cookies and URL parameters for maximum compatibility
-    const cookieOptions = {
-      expires: new Date(Date.now() + process.env.JWT_COOKIE_EXPIRE * 24 * 60 * 60 * 1000),
-      httpOnly: false,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
-      path: '/'
+    // Create a special encoded state that contains all the auth information
+    const authPayload = {
+      token: token,
+      user: {
+        id: req.user.id || req.user._id,
+        _id: req.user._id || req.user.id,
+        name: req.user.name,
+        email: req.user.email,
+        role: req.user.role || 'user',
+        tenantId: req.user.tenantId
+      }
     };
-    
-    if (process.env.NODE_ENV === 'production' && process.env.COOKIE_DOMAIN) {
-      cookieOptions.domain = process.env.COOKIE_DOMAIN;
-    }
 
-    // Set cookies
-    res.cookie('auth_token', token, cookieOptions);
-    res.cookie('auth_tenant', req.user.tenantId, cookieOptions);
-    
-    // Store full user object in cookie
-    const userForCookie = {
-      id: req.user.id,
-      _id: req.user._id,
-      name: req.user.name,
-      email: req.user.email,
-      role: req.user.role || 'user',
-      tenantId: req.user.tenantId
-    };
-    
-    res.cookie('auth_user', JSON.stringify(userForCookie), cookieOptions);
-    
-    // Also send as URL parameters as a fallback
-    res.redirect(`${process.env.CLIENT_URL}/dashboard?token=${token}&tenantId=${req.user.tenantId}&userId=${req.user.id}&name=${encodeURIComponent(req.user.name)}&email=${encodeURIComponent(req.user.email)}&role=${req.user.role || 'user'}&googleAuth=true`);
+    // Base64 encode the auth payload to avoid issues with special characters
+    const encodedPayload = Buffer.from(JSON.stringify(authPayload)).toString('base64');
+
+    // Redirect to a special auth handler page with the encoded payload
+    res.redirect(`${process.env.CLIENT_URL}/auth-handler?payload=${encodedPayload}`);
   }
 );
 

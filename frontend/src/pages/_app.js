@@ -31,28 +31,47 @@ function AuthChecker({ children }) {
   
   // Check authentication on mount
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const storedToken = localStorage.getItem('token');
-      const storedUser = localStorage.getItem('user');
-      const storedTenantId = localStorage.getItem('tenantId');
+    const checkAndRestoreAuth = () => {
+      if (typeof window === 'undefined') return;
       
-      // Only restore if we have token and either no auth or different token
-      if (storedToken && (!token || storedToken !== token)) {
+      console.log('AuthChecker: Verifying authentication state');
+      const storedToken = localStorage.getItem('token');
+      const storedUserJson = localStorage.getItem('user');
+      
+      // Skip auth-handler page - it handles its own auth
+      if (router.pathname === '/auth-handler') {
+        setVerified(true);
+        return;
+      }
+      
+      // If we have stored credentials but not in Redux, restore them
+      if (storedToken && storedUserJson && !isAuthenticated) {
         try {
-          const userData = storedUser ? JSON.parse(storedUser) : { tenantId: storedTenantId };
+          const storedUser = JSON.parse(storedUserJson);
           console.log('Restoring authentication from localStorage');
-          dispatch(loginSuccess({ token: storedToken, user: userData }));
+          
+          // Dispatch loginSuccess action to Redux
+          dispatch(loginSuccess({ 
+            token: storedToken, 
+            user: storedUser 
+          }));
         } catch (e) {
-          console.error('Error restoring auth state:', e);
+          console.error('Error parsing stored user data:', e);
+          // Clear invalid data
+          localStorage.removeItem('token');
+          localStorage.removeItem('user');
+          localStorage.removeItem('tenantId');
         }
       }
       
       setVerified(true);
-    }
-  }, [dispatch, token]);
+    };
+    
+    checkAndRestoreAuth();
+  }, [dispatch, router.pathname, isAuthenticated]);
   
   // Public pages that don't require authentication
-  const publicPages = ['/', '/login', '/register'];
+  const publicPages = ['/', '/login', '/register', '/auth-handler'];
   const isPublicPage = publicPages.includes(router.pathname);
   
   // Show page if it's public or we're authenticated or still verifying
@@ -61,7 +80,8 @@ function AuthChecker({ children }) {
   }
   
   // Redirect to login if private page and not authenticated
-  if (typeof window !== 'undefined' && verified && !isAuthenticated) {
+  if (verified && !isAuthenticated) {
+    console.log('Not authenticated, redirecting to login from:', router.pathname);
     router.replace('/login');
     return null;
   }
