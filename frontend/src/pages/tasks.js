@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
+import { useRouter } from 'next/router';
 import dynamic from 'next/dynamic';
 
 // Import the layout component dynamically to avoid hydration issues
@@ -64,6 +65,8 @@ const statusColors = {
 
 export default function Tasks() {
   const dispatch = useDispatch();
+  const router = useRouter();
+  const { project: projectId } = router.query;
   const { tasks, isLoading, error } = useSelector((state) => state.tasks);
   const { projects } = useSelector((state) => state.projects);
   const { user } = useSelector((state) => state.auth);
@@ -90,13 +93,17 @@ export default function Tasks() {
   const [menuTaskId, setMenuTaskId] = useState(null);
   
   useEffect(() => {
-    dispatch(getTasks({}));
-    dispatch(getProjects({})); 
-  }, [dispatch]);
+    const params = projectId ? { project: projectId } : {};
+    dispatch(getTasks(params));
+    dispatch(getProjects({}));
+  }, [dispatch, projectId]);
   
   useEffect(() => {
     console.log('Available projects:', projects);
-  }, [projects]);
+    if (projectId) {
+      console.log(`Filtering tasks for project ID: ${projectId}`);
+    }
+  }, [projects, projectId]);
   
   const handleOpenTaskDialog = (task = null) => {
     if (task) {
@@ -118,7 +125,7 @@ export default function Tasks() {
         description: '',
         status: 'Not Started',
         priority: 'medium',
-        projectId: '',
+        projectId: projectId || '', // Pre-select the current project if we're on a project-specific view
         assignee: user?._id || '',
         dueDate: null,
       });
@@ -245,9 +252,25 @@ export default function Tasks() {
   };
   
   const getFilteredTasks = () => {
-    if (taskFilter === 'all') return tasks;
-    if (taskFilter === 'my') return tasks.filter(task => task.assignee === user?._id);
-    return tasks.filter(task => task.status === taskFilter);
+    // First filter by project if we have a projectId from router query
+    let filteredByProject = tasks;
+    
+    // If we're not already filtering by project at the API level and have a projectId,
+    // we need to filter the tasks here
+    if (!router.query.project && projectId) {
+      filteredByProject = tasks.filter(task => {
+        return (
+          (task.projectId === projectId) || 
+          (task.project?._id === projectId) || 
+          (task.project === projectId)
+        );
+      });
+    }
+    
+    // Then apply the other filters
+    if (taskFilter === 'all') return filteredByProject;
+    if (taskFilter === 'my') return filteredByProject.filter(task => task.assignee === user?._id);
+    return filteredByProject.filter(task => task.status === taskFilter);
   };
   
   const handleCloseSnackbar = (event, reason) => {
@@ -259,10 +282,27 @@ export default function Tasks() {
   
   const filteredTasks = getFilteredTasks();
   
+  // Find current project name if we're filtering by project
+  const currentProject = projectId ? projects.find(p => p._id === projectId) : null;
+
   return (
     <DashboardLayout>
       <Box sx={{ mb: 4, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <Typography variant="h4">Tasks</Typography>
+        <Box>
+          <Typography variant="h4">
+            {currentProject ? `${currentProject.name} Tasks` : 'Tasks'}
+          </Typography>
+          {currentProject && (
+            <Button 
+              variant="text" 
+              size="small"
+              onClick={() => router.push('/tasks')}
+              sx={{ mt: 0.5 }}
+            >
+              Show All Tasks
+            </Button>
+          )}
+        </Box>
         <Box>
           <Button
             variant="outlined"
