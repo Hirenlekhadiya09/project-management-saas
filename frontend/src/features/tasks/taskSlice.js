@@ -109,21 +109,16 @@ export const createTask = createAsyncThunk(
   'tasks/create',
   async (taskData, thunkAPI) => {
     try {
-      // Map frontend field names to backend field names
       const mappedData = {
         ...taskData,
-        project: taskData.projectId, // Convert projectId to project
-        assignedTo: taskData.assignee // Convert assignee to assignedTo if it exists
+        project: taskData.projectId
       };
       
-      // Map status values from frontend to backend
       if (mappedData.status) {
         mappedData.status = statusMapping.frontendToBackend[mappedData.status] || 'todo';
       }
       
-      // Remove frontend-specific field names
       delete mappedData.projectId;
-      delete mappedData.assignee;
       
       const response = await api.post('/tasks', mappedData);
       return response.data;
@@ -143,21 +138,16 @@ export const updateTask = createAsyncThunk(
   'tasks/update',
   async ({ taskId, taskData }, thunkAPI) => {
     try {
-      // Map frontend field names to backend field names
       const mappedData = {
         ...taskData,
-        project: taskData.projectId, // Convert projectId to project
-        assignedTo: taskData.assignee // Convert assignee to assignedTo if it exists
+        project: taskData.projectId
       };
       
-      // Map status values from frontend to backend
       if (mappedData.status) {
         mappedData.status = statusMapping.frontendToBackend[mappedData.status] || 'todo';
       }
       
-      // Remove frontend-specific field names
       delete mappedData.projectId;
-      delete mappedData.assignee;
       
       const response = await api.put(`/tasks/${taskId}`, mappedData);
       return response.data;

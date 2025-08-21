@@ -136,23 +136,20 @@ export default function Dashboard() {
                     }}
                     onClick={() => router.push(`/tasks?id=${task._id}`)}
                   >
-                    {/* Priority indicator chip */}
-                    <Chip
-                      label={task.priority}
-                      size="small"
-                      color={
-                        task.priority === 'high' ? 'error' :
-                        task.priority === 'medium' ? 'warning' : 'success'
-                      }
-                      sx={{ 
-                        position: 'absolute',
-                        top: 8,
-                        right: 8,
-                        textTransform: 'capitalize'
-                      }}
-                    />
-                    
-                    <Typography variant="subtitle1" sx={{ fontWeight: 'bold', pr: 8 }}>{task.title}</Typography>
+                          <Chip
+                            label={task.priority}
+                            size="small"
+                            color={
+                              task.priority === 'high' ? 'error' :
+                              task.priority === 'medium' ? 'warning' : 'success'
+                            }
+                            sx={{ 
+                              position: 'absolute',
+                              top: 8,
+                              right: 8,
+                              textTransform: 'capitalize'
+                            }}
+                          />                    <Typography variant="subtitle1" sx={{ fontWeight: 'bold', pr: 8 }}>{task.title}</Typography>
                     
                     <Box sx={{ display: 'flex', alignItems: 'center', mt: 1 }}>
                       <Chip

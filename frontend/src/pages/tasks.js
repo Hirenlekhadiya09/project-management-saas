@@ -95,17 +95,13 @@ export default function Tasks() {
   const [menuTaskId, setMenuTaskId] = useState(null);
   
   useEffect(() => {
-    // Check if there's a filter parameter in URL
     if (router.query.filter === 'my') {
       setTaskFilter('my');
     }
     
-    // Check if there's a specific task ID in the URL
     const taskId = router.query.id;
-    
     const params = projectId ? { project: projectId } : {};
     
-    // If we're filtering by "my tasks" or user is a team member
     if (taskFilter === 'my' || router.query.filter === 'my' || user?.role === 'team_member') {
       params.myTasks = true; 
     }
@@ -117,14 +113,13 @@ export default function Tasks() {
       dispatch(getUsers());
     }
     
-    // If there's a task ID in the URL, open that task for editing
     if (taskId && tasks.length > 0) {
       const task = tasks.find(t => t._id === taskId);
       if (task) {
         handleOpenTaskDialog(task);
       }
     }
-  }, [dispatch, projectId, user?.role, router.query.filter, router.query.id]);
+  }, [dispatch, projectId, user?.role, router.query.filter, router.query.id, taskFilter]);
   
   useEffect(() => {
     console.log('Available projects:', projects);
@@ -456,16 +451,30 @@ export default function Tasks() {
                           />
                         )}
                         <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>
-                          <Avatar 
-                            sx={{ width: 30, height: 30 }} 
-                            title={task.assignedTo?.name || 'Unassigned'}
-                          >
-                            {task.assignedTo?.name ? task.assignedTo.name.charAt(0) : 'U'}
-                          </Avatar>
-                          {task.assignedTo?.name && (
-                            <Typography variant="caption" sx={{ fontSize: '0.7rem' }}>
-                              {task.assignedTo.name}
-                            </Typography>
+                          {task.assignedTo ? (
+                            <>
+                              <Avatar 
+                                sx={{ width: 30, height: 30 }} 
+                                title={task.assignedTo?.name || 'Assigned'}
+                              >
+                                {task.assignedTo?.name ? task.assignedTo.name.charAt(0) : 'A'}
+                              </Avatar>
+                              <Typography variant="caption" sx={{ fontSize: '0.7rem' }}>
+                                {task.assignedTo?.name || 'Assigned'}
+                              </Typography>
+                            </>
+                          ) : (
+                            <>
+                              <Avatar 
+                                sx={{ width: 30, height: 30, bgcolor: 'grey.300' }} 
+                                title="Unassigned"
+                              >
+                                U
+                              </Avatar>
+                              <Typography variant="caption" sx={{ fontSize: '0.7rem', color: 'text.secondary' }}>
+                                Unassigned
+                              </Typography>
+                            </>
                           )}
                         </Box>
                       </Box>

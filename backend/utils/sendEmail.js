@@ -2,6 +2,19 @@ const nodemailer = require('nodemailer');
 
 const sendEmail = async (options) => {
   try {
+    if (process.env.NODE_ENV !== 'production') {
+      console.log('====== EMAIL WOULD BE SENT ======');
+      console.log(`To: ${options.email}`);
+      console.log(`Subject: ${options.subject}`);
+      console.log('Message:');
+      console.log(options.message);
+      console.log('================================');
+      
+      return { 
+        messageId: `mock-email-${Date.now()}`,
+        success: true
+      };
+    }
     const transporter = nodemailer.createTransport({
       service: 'gmail',
       host: 'smtp.gmail.com',
@@ -17,7 +30,7 @@ const sendEmail = async (options) => {
     });
 
     const message = {
-      from: `${process.env.FROM_NAME} <${process.env.FROM_EMAIL}>`,
+      from: `${process.env.FROM_NAME || 'Task Management'} <${process.env.FROM_EMAIL || 'noreply@taskmanagement.com'}>`,
       to: options.email,
       subject: options.subject,
       text: options.message
