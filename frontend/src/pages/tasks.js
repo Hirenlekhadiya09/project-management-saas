@@ -14,6 +14,7 @@ import {
   deleteTask,
 } from '../features/tasks/taskSlice';
 import { getProjects } from '../features/projects/projectSlice';
+import { getUsers } from '../features/users/userSlice';
 import {
   Box,
   Typography,
@@ -69,6 +70,7 @@ export default function Tasks() {
   const { project: projectId } = router.query;
   const { tasks, isLoading, error } = useSelector((state) => state.tasks);
   const { projects } = useSelector((state) => state.projects);
+  const { users } = useSelector((state) => state.users);
   const { user } = useSelector((state) => state.auth);
   
   const [snackbar, setSnackbar] = useState({
@@ -85,18 +87,44 @@ export default function Tasks() {
     status: 'Not Started',
     priority: 'medium',
     projectId: '',
-    assignee: '',
+    assignedTo: '', // Changed from assignee to assignedTo to match backend field name
     dueDate: null,
   });
-  const [taskFilter, setTaskFilter] = useState('all');
+  const [taskFilter, setTaskFilter] = useState(user?.role === 'team_member' ? 'my' : 'all');
   const [anchorEl, setAnchorEl] = useState(null);
   const [menuTaskId, setMenuTaskId] = useState(null);
   
   useEffect(() => {
+    // Check if there's a filter parameter in URL
+    if (router.query.filter === 'my') {
+      setTaskFilter('my');
+    }
+    
+    // Check if there's a specific task ID in the URL
+    const taskId = router.query.id;
+    
     const params = projectId ? { project: projectId } : {};
+    
+    // If we're filtering by "my tasks" or user is a team member
+    if (taskFilter === 'my' || router.query.filter === 'my' || user?.role === 'team_member') {
+      params.myTasks = true; 
+    }
+    
     dispatch(getTasks(params));
     dispatch(getProjects({}));
-  }, [dispatch, projectId]);
+    
+    if (user?.role === 'admin' || user?.role === 'project_manager') {
+      dispatch(getUsers());
+    }
+    
+    // If there's a task ID in the URL, open that task for editing
+    if (taskId && tasks.length > 0) {
+      const task = tasks.find(t => t._id === taskId);
+      if (task) {
+        handleOpenTaskDialog(task);
+      }
+    }
+  }, [dispatch, projectId, user?.role, router.query.filter, router.query.id]);
   
   useEffect(() => {
     console.log('Available projects:', projects);
@@ -115,7 +143,7 @@ export default function Tasks() {
         status: task.status,
         priority: task.priority,
         projectId: task.project?._id || task.project,
-        assignee: task.assignedTo?._id || task.assignedTo,
+        assignedTo: task.assignedTo?._id || task.assignedTo,
         dueDate: task.dueDate ? new Date(task.dueDate) : null,
       });
     } else {
@@ -126,7 +154,7 @@ export default function Tasks() {
         status: 'Not Started',
         priority: 'medium',
         projectId: projectId || '', // Pre-select the current project if we're on a project-specific view
-        assignee: user?._id || '',
+        assignedTo: '',  // Don't pre-assign to current user, let admin/manager choose
         dueDate: null,
       });
     }
@@ -269,7 +297,13 @@ export default function Tasks() {
     
     // Then apply the other filters
     if (taskFilter === 'all') return filteredByProject;
-    if (taskFilter === 'my') return filteredByProject.filter(task => task.assignee === user?._id);
+    if (taskFilter === 'my') {
+      return filteredByProject.filter(task => {
+        // Check both _id and string representation
+        return task.assignedTo?._id === user?._id || 
+               task.assignedTo === user?._id;
+      });
+    }
     return filteredByProject.filter(task => task.status === taskFilter);
   };
   
@@ -310,15 +344,30 @@ export default function Tasks() {
             sx={{ mr: 2 }}
             onClick={(e) => setAnchorEl(e.currentTarget)}
           >
-            Filter: {taskFilter.charAt(0).toUpperCase() + taskFilter.slice(1)}
+            Filter: {taskFilter === 'my' ? 'Assigned to Me' : taskFilter.charAt(0).toUpperCase() + taskFilter.slice(1)}
           </Button>
           <Menu
             anchorEl={anchorEl}
             open={Boolean(anchorEl && !menuTaskId)}
             onClose={() => setAnchorEl(null)}
           >
-            <MenuItem onClick={() => handleFilterChange('all')}>All Tasks</MenuItem>
-            <MenuItem onClick={() => handleFilterChange('my')}>My Tasks</MenuItem>
+            {/* Only show "All Tasks" option to admin and project managers */}
+            {user?.role !== 'team_member' && (
+              <MenuItem onClick={() => handleFilterChange('all')}>All Tasks</MenuItem>
+            )}
+            <MenuItem 
+              onClick={() => handleFilterChange('my')}
+              sx={{ 
+                fontWeight: 'bold', 
+                bgcolor: 'primary.light',
+                color: 'primary.contrastText',
+                '&:hover': {
+                  bgcolor: 'primary.main',
+                }
+              }}
+            >
+              Assigned to Me
+            </MenuItem>
             <Divider />
             <MenuItem onClick={() => handleFilterChange('Not Started')}>Not Started</MenuItem>
             <MenuItem onClick={() => handleFilterChange('In Progress')}>In Progress</MenuItem>
@@ -396,9 +445,30 @@ export default function Tasks() {
                       <Typography variant="caption" color="text.secondary">
                         {task.dueDate ? `Due: ${new Date(task.dueDate).toLocaleDateString()}` : 'No due date set'}
                       </Typography>
-                      <Avatar sx={{ width: 30, height: 30 }}>
-                        {task.assignedTo?.name ? task.assignedTo.name.charAt(0) : 'U'}
-                      </Avatar>
+                      <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                        {(task.assignedTo?._id === user?._id || task.assignedTo === user?._id) && (
+                          <Chip 
+                            label="Assigned to me" 
+                            size="small" 
+                            color="primary" 
+                            variant="outlined" 
+                            sx={{ mr: 1 }} 
+                          />
+                        )}
+                        <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>
+                          <Avatar 
+                            sx={{ width: 30, height: 30 }} 
+                            title={task.assignedTo?.name || 'Unassigned'}
+                          >
+                            {task.assignedTo?.name ? task.assignedTo.name.charAt(0) : 'U'}
+                          </Avatar>
+                          {task.assignedTo?.name && (
+                            <Typography variant="caption" sx={{ fontSize: '0.7rem' }}>
+                              {task.assignedTo.name}
+                            </Typography>
+                          )}
+                        </Box>
+                      </Box>
                     </Box>
                     {task.status !== 'Completed' && (
                       <Button
@@ -531,6 +601,31 @@ export default function Tasks() {
                 )}
               </TextField>
             </Grid>
+            {/* Only show assign field for admin and project managers */}
+            {(user?.role === 'admin' || user?.role === 'project_manager') && (
+              <Grid item xs={12}>
+                <TextField
+                  margin="dense"
+                  name="assignedTo"
+                  label="Assign To"
+                  fullWidth
+                  variant="outlined"
+                  value={taskForm.assignedTo}
+                  onChange={handleTaskFormChange}
+                  select
+                  helperText="Assign this task to a team member"
+                >
+                  <MenuItem value="">
+                    <em>Unassigned</em>
+                  </MenuItem>
+                  {users && users.filter(u => u.role === 'team_member').map((teamMember) => (
+                    <MenuItem key={teamMember._id} value={teamMember._id}>
+                      {teamMember.name} ({teamMember.email})
+                    </MenuItem>
+                  ))}
+                </TextField>
+              </Grid>
+            )}
           </Grid>
         </DialogContent>
         <DialogActions>
@@ -557,8 +652,59 @@ export default function Tasks() {
           <EditIcon fontSize="small" sx={{ mr: 1 }} />
           Edit
         </MenuItem>
+        
+        {/* Quick Assign submenu for admin and project managers */}
+        {(user?.role === 'admin' || user?.role === 'project_manager') && users && users.length > 0 && (
+          <Box sx={{ position: 'relative' }}>
+            <Divider />
+            <Typography variant="caption" sx={{ px: 2, py: 0.5, display: 'block', color: 'text.secondary' }}>
+              Quick Assign To:
+            </Typography>
+            {users
+              .filter(u => u.role === 'team_member')
+              .slice(0, 5)  // Limit to first 5 users to prevent menu from being too long
+              .map(teamMember => (
+                <MenuItem 
+                  key={teamMember._id}
+                  onClick={() => {
+                    dispatch(updateTask({ 
+                      taskId: menuTaskId, 
+                      taskData: { assignedTo: teamMember._id }
+                    }));
+                    setSnackbar({
+                      open: true,
+                      message: `Task assigned to ${teamMember.name}`,
+                      severity: 'success'
+                    });
+                    handleCloseMenu();
+                  }}
+                >
+                  <Avatar 
+                    sx={{ width: 24, height: 24, mr: 1, fontSize: '0.75rem' }}
+                  >
+                    {teamMember.name.charAt(0)}
+                  </Avatar>
+                  {teamMember.name}
+                </MenuItem>
+              ))
+            }
+            {users.filter(u => u.role === 'team_member').length > 5 && (
+              <MenuItem
+                onClick={() => {
+                  const task = tasks.find((t) => t._id === menuTaskId);
+                  handleOpenTaskDialog(task);
+                  handleCloseMenu();
+                }}
+              >
+                <Typography variant="body2" color="primary.main">Show all team members...</Typography>
+              </MenuItem>
+            )}
+            <Divider />
+          </Box>
+        )}
+        
         {/* Only show delete option for admin users and project managers */}
-        {(user?.role === 'admin' || user?.role === 'manager') && (
+        {(user?.role === 'admin' || user?.role === 'project_manager') && (
           <MenuItem
             onClick={() => handleDeleteTask(menuTaskId)}
             sx={{ color: 'error.main' }}

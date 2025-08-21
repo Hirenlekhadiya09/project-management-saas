@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { Typography, Box, Grid, Paper, Card, CardContent } from '@mui/material';
+import { Typography, Box, Grid, Paper, Card, CardContent, Chip, Button } from '@mui/material';
 import { useSelector, useDispatch } from 'react-redux';
 import dynamic from 'next/dynamic';
 import { useRouter } from 'next/router';
@@ -119,18 +119,82 @@ export default function Dashboard() {
               
               {tasks && tasks.length > 0 ? (
                 tasks.map((task) => (
-                  <Paper key={task._id} sx={{ p: 2, mb: 2 }}>
-                    <Typography variant="subtitle1">{task.title}</Typography>
-                    <Typography variant="body2" color="text.secondary">
-                      Status: {task.status}
-                    </Typography>
-                    <Typography variant="body2" color="text.secondary">
-                      Project: {task.project?.name || 'Unknown'}
-                    </Typography>
+                  <Paper 
+                    key={task._id} 
+                    sx={{ 
+                      p: 2, 
+                      mb: 2, 
+                      borderLeft: '4px solid',
+                      borderColor: task.priority === 'high' ? 'error.main' : 
+                                  task.priority === 'medium' ? 'warning.main' : 
+                                  'success.main',
+                      cursor: 'pointer',
+                      position: 'relative',
+                      '&:hover': {
+                        backgroundColor: 'rgba(0, 0, 0, 0.04)',
+                      }
+                    }}
+                    onClick={() => router.push(`/tasks?id=${task._id}`)}
+                  >
+                    {/* Priority indicator chip */}
+                    <Chip
+                      label={task.priority}
+                      size="small"
+                      color={
+                        task.priority === 'high' ? 'error' :
+                        task.priority === 'medium' ? 'warning' : 'success'
+                      }
+                      sx={{ 
+                        position: 'absolute',
+                        top: 8,
+                        right: 8,
+                        textTransform: 'capitalize'
+                      }}
+                    />
+                    
+                    <Typography variant="subtitle1" sx={{ fontWeight: 'bold', pr: 8 }}>{task.title}</Typography>
+                    
+                    <Box sx={{ display: 'flex', alignItems: 'center', mt: 1 }}>
+                      <Chip
+                        label={task.status === 'todo' ? 'Not Started' : 
+                               task.status === 'in-progress' ? 'In Progress' :
+                               task.status === 'review' ? 'Under Review' : 'Completed'}
+                        size="small"
+                        variant="outlined"
+                        color={task.status === 'done' ? 'success' : 'default'}
+                        sx={{ mr: 1 }}
+                      />
+                      <Typography variant="body2" color="text.secondary">
+                        Project: {task.project?.name || 'Unknown'}
+                      </Typography>
+                    </Box>
+                    
+                    {task.dueDate && (
+                      <Typography 
+                        variant="body2" 
+                        color={new Date(task.dueDate) < new Date() ? "error.main" : "text.secondary"}
+                        fontWeight={new Date(task.dueDate) < new Date() ? "bold" : "normal"}
+                        sx={{ mt: 1 }}
+                      >
+                        Due: {new Date(task.dueDate).toLocaleDateString()}
+                        {new Date(task.dueDate) < new Date() && ' (OVERDUE)'}
+                      </Typography>
+                    )}
                   </Paper>
                 ))
               ) : (
-                <Typography variant="body1">No tasks found</Typography>
+                <Typography variant="body1">No tasks assigned to you</Typography>
+              )}
+              
+              {tasks && tasks.length > 0 && (
+                <Box sx={{ textAlign: 'center', mt: 2 }}>
+                  <Button 
+                    variant="contained"
+                    onClick={() => router.push('/tasks?filter=my')}
+                  >
+                    View All My Tasks
+                  </Button>
+                </Box>
               )}
             </CardContent>
           </Card>

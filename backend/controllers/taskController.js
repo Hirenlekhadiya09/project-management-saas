@@ -2,6 +2,7 @@ const Task = require('../models/Task');
 const Project = require('../models/Project');
 const User = require('../models/User');
 const Notification = require('../models/Notification');
+const sendEmail = require('../utils/sendEmail');
 
 // @desc    Create new task
 // @route   POST /api/tasks
@@ -51,10 +52,12 @@ exports.createTask = async (req, res) => {
 
     // Notify assigned user if any
     if (req.body.assignedTo) {
+      // Create in-app notification
+      const project = await Project.findById(req.body.project, 'name');
       await Notification.create({
         type: 'task_assigned',
         title: 'New task assigned',
-        message: `You have been assigned to task: ${task.title}`,
+        message: `You have been assigned to task: "${task.title}" in project "${project.name}" with ${task.priority} priority${task.dueDate ? ` due by ${new Date(task.dueDate).toLocaleDateString()}` : ''}`,
         recipient: req.body.assignedTo,
         sender: req.user.id,
         relatedResource: {
@@ -63,6 +66,42 @@ exports.createTask = async (req, res) => {
         },
         tenantId: req.user.tenantId
       });
+      
+      // Send email notification
+      try {
+        // Get the assigned user's email
+        const assignedUser = await User.findById(req.body.assignedTo);
+        const projectDetails = await Project.findById(req.body.project, 'name');
+        
+        if (assignedUser && assignedUser.email) {
+          await sendEmail({
+            email: assignedUser.email,
+            subject: `New Task Assigned: ${task.title}`,
+            message: `
+Hello ${assignedUser.name},
+
+You have been assigned a new task:
+
+Task: ${task.title}
+Project: ${projectDetails.name}
+Priority: ${task.priority}
+Due Date: ${task.dueDate ? new Date(task.dueDate).toLocaleDateString() : 'Not set'}
+Status: ${task.status}
+
+Description:
+${task.description || 'No description provided'}
+
+You can view this task in your dashboard.
+
+Regards,
+The Task Management Team
+            `
+          });
+        }
+      } catch (err) {
+        console.error('Error sending email notification:', err);
+        // Don't fail the task creation if email fails
+      }
     }
 
     // Populate task with user data
@@ -264,10 +303,11 @@ exports.updateTask = async (req, res) => {
 
     // If task was assigned to a new user, create notification
     if (newAssignee) {
+      // Create in-app notification
       await Notification.create({
         type: 'task_assigned',
         title: 'Task assigned to you',
-        message: `You have been assigned to task: ${task.title}`,
+        message: `You have been assigned to task: "${task.title}" in project "${task.project.name}" with ${task.priority} priority${task.dueDate ? ` due by ${new Date(task.dueDate).toLocaleDateString()}` : ''}`,
         recipient: req.body.assignedTo,
         sender: req.user.id,
         relatedResource: {
@@ -276,6 +316,41 @@ exports.updateTask = async (req, res) => {
         },
         tenantId: req.user.tenantId
       });
+      
+      // Send email notification for task reassignment
+      try {
+        // Get the assigned user's email
+        const assignedUser = await User.findById(req.body.assignedTo);
+        
+        if (assignedUser && assignedUser.email) {
+          await sendEmail({
+            email: assignedUser.email,
+            subject: `Task Assigned: ${task.title}`,
+            message: `
+Hello ${assignedUser.name},
+
+You have been assigned to the following task:
+
+Task: ${task.title}
+Project: ${task.project.name}
+Priority: ${task.priority}
+Due Date: ${task.dueDate ? new Date(task.dueDate).toLocaleDateString() : 'Not set'}
+Status: ${task.status}
+
+Description:
+${task.description || 'No description provided'}
+
+You can view this task in your dashboard.
+
+Regards,
+The Task Management Team
+            `
+          });
+        }
+      } catch (err) {
+        console.error('Error sending email notification:', err);
+        // Don't fail the task update if email fails
+      }
     } 
     // If task status changed, notify assigned user (if not the updater)
     else if (
@@ -283,6 +358,7 @@ exports.updateTask = async (req, res) => {
       task.assignedTo && 
       task.assignedTo._id.toString() !== req.user.id
     ) {
+      // Create in-app notification
       await Notification.create({
         type: 'task_updated',
         title: 'Task status updated',
@@ -295,6 +371,41 @@ exports.updateTask = async (req, res) => {
         },
         tenantId: req.user.tenantId
       });
+      
+      // Send email notification for status update
+      try {
+        // Get the status-friendly name
+        const statusMap = {
+          'todo': 'Not Started',
+          'in-progress': 'In Progress',
+          'review': 'Under Review',
+          'done': 'Completed'
+        };
+        const friendlyStatus = statusMap[req.body.status] || req.body.status;
+        
+        // Send email to the task assignee
+        await sendEmail({
+          email: task.assignedTo.email,
+          subject: `Task Status Updated: ${task.title}`,
+          message: `
+Hello ${task.assignedTo.name},
+
+The status of your task has been updated:
+
+Task: ${task.title}
+Project: ${task.project.name}
+New Status: ${friendlyStatus}
+
+You can view this task in your dashboard.
+
+Regards,
+The Task Management Team
+          `
+        });
+      } catch (err) {
+        console.error('Error sending email notification for status update:', err);
+        // Don't fail the task update if email fails
+      }
     }
 
     res.status(200).json({
