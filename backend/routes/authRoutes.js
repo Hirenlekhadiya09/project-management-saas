@@ -37,8 +37,31 @@ router.get('/google/callback',
       expiresIn: process.env.JWT_EXPIRE
     });
 
-    // Simple approach - just redirect with URL parameters
-    res.redirect(`${process.env.CLIENT_URL}/dashboard?token=${token}&tenantId=${req.user.tenantId}&userId=${req.user.id}&name=${encodeURIComponent(req.user.name)}&email=${encodeURIComponent(req.user.email)}&role=${req.user.role || 'user'}`);
+    // Set cookies instead of URL parameters
+    const cookieOptions = {
+      expires: new Date(Date.now() + process.env.JWT_COOKIE_EXPIRE * 24 * 60 * 60 * 1000),
+      httpOnly: false,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
+      path: '/'
+    };
+    
+    if (process.env.NODE_ENV === 'production' && process.env.COOKIE_DOMAIN) {
+      cookieOptions.domain = process.env.COOKIE_DOMAIN;
+    }
+
+    // Set cookies
+    res.cookie('auth_token', token, cookieOptions);
+    res.cookie('auth_tenant', req.user.tenantId, cookieOptions);
+    res.cookie('auth_user', JSON.stringify({
+      id: req.user.id,
+      name: req.user.name,
+      email: req.user.email,
+      role: req.user.role || 'user'
+    }), cookieOptions);
+    
+    // Redirect to dashboard without query parameters
+    res.redirect(`${process.env.CLIENT_URL}/dashboard`);
   }
 );
 

@@ -44,18 +44,35 @@ export default function Login() {
     
     const cookieToken = getCookie('auth_token');
     const cookieTenantId = getCookie('auth_tenant');
+    const cookieUser = getCookie('auth_user');
     
     if (cookieToken && cookieTenantId && !isAuthenticated) {
+      console.log('Login: Found auth cookies, setting up authentication');
       localStorage.setItem('token', cookieToken);
       localStorage.setItem('tenantId', cookieTenantId);
+      
+      let userData = { tenantId: cookieTenantId };
+      if (cookieUser) {
+        try {
+          userData = { ...JSON.parse(cookieUser), tenantId: cookieTenantId };
+          localStorage.setItem('user', cookieUser);
+        } catch (e) {
+          console.error('Error parsing user cookie:', e);
+        }
+      }
       
       dispatch({ 
         type: 'auth/loginSuccess',
         payload: { 
           token: cookieToken,
-          user: { tenantId: cookieTenantId }
+          user: userData
         }
       });
+      
+      // Clean cookies after consuming them
+      document.cookie = 'auth_token=; Max-Age=0; path=/;';
+      document.cookie = 'auth_tenant=; Max-Age=0; path=/;';
+      document.cookie = 'auth_user=; Max-Age=0; path=/;';
       
       // Redirect to dashboard
       router.push('/dashboard');

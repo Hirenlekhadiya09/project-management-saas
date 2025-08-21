@@ -20,33 +20,84 @@ export default function Dashboard() {
   const { tasks } = useSelector((state) => state.tasks);
   
   useEffect(() => {
-    const { token, tenantId, userId, name, email, role } = router.query;
+    // Helper function to get cookies
+    const getCookie = (name) => {
+      if (typeof document === 'undefined') return null;
+      const value = `; ${document.cookie}`;
+      const parts = value.split(`; ${name}=`);
+      if (parts.length === 2) return parts.pop().split(';').shift();
+      return null;
+    };
     
-    if (token && tenantId) {
-      localStorage.setItem('token', token);
-      localStorage.setItem('tenantId', tenantId);
+    // Check for cookies first (from Google OAuth)
+    const cookieToken = getCookie('auth_token');
+    const cookieTenantId = getCookie('auth_tenant');
+    const cookieUser = getCookie('auth_user');
+    
+    if (cookieToken && cookieTenantId) {
+      console.log('Found auth cookies, setting up authentication');
+      localStorage.setItem('token', cookieToken);
+      localStorage.setItem('tenantId', cookieTenantId);
       
-      const user = {
-        id: userId,
-        tenantId: tenantId,
-        name: name || '',
-        email: email || '',
-        role: role || 'user'
-      };
-      
-      localStorage.setItem('user', JSON.stringify(user));
+      let userData = {};
+      if (cookieUser) {
+        try {
+          userData = JSON.parse(cookieUser);
+          localStorage.setItem('user', cookieUser);
+        } catch (e) {
+          console.error('Error parsing user cookie:', e);
+        }
+      }
       
       // Update Redux state with authentication data
       dispatch({ 
         type: 'auth/loginSuccess',
-        payload: { token, user }
+        payload: { 
+          token: cookieToken,
+          user: {
+            ...userData,
+            tenantId: cookieTenantId
+          }
+        }
       });
       
-      // Clean up the URL without the parameters
-      router.replace('/dashboard', undefined, { shallow: true });
+      // Clean cookies after consuming them
+      document.cookie = 'auth_token=; Max-Age=0; path=/;';
+      document.cookie = 'auth_tenant=; Max-Age=0; path=/;';
+      document.cookie = 'auth_user=; Max-Age=0; path=/;';
       
-      // No need to fetch profile if we already have user data
-      if (!name || !email) {
+      // Fetch complete profile
+      dispatch(getProfile());
+    }
+    // Check URL parameters as fallback (old method)
+    else {
+      const { token, tenantId, userId, name, email, role } = router.query;
+      
+      if (token && tenantId) {
+        console.log('Found URL parameters, setting up authentication');
+        localStorage.setItem('token', token);
+        localStorage.setItem('tenantId', tenantId);
+        
+        const user = {
+          id: userId,
+          tenantId: tenantId,
+          name: name || '',
+          email: email || '',
+          role: role || 'user'
+        };
+        
+        localStorage.setItem('user', JSON.stringify(user));
+        
+        // Update Redux state with authentication data
+        dispatch({ 
+          type: 'auth/loginSuccess',
+          payload: { token, user }
+        });
+        
+        // Clean up the URL without the parameters
+        router.replace('/dashboard', undefined, { shallow: true });
+        
+        // Fetch profile to ensure we have complete data
         dispatch(getProfile());
       }
     }
