@@ -161,14 +161,34 @@ io.on('connection', (socket) => {
     
     const roomName = `user:${userId}`;
     socket.join(roomName);
-    console.log(`Client ${socket.id} joined user room: ${roomName}`);
+    console.log(`[SOCKET] Client ${socket.id} joined user room: ${roomName}`);
     
-    // Confirm room join and test notification
+    // Store userId in socket for debugging purposes
+    socket.userId = userId;
+    
+    // Confirm room join 
     socket.emit('joined-user-room', { userId, roomName });
-    socket.emit('test-notification', { 
-      message: 'Successfully connected to notification system',
-      time: new Date().toISOString()
-    });
+    
+    // Send test notification to verify the notification system works
+    setTimeout(() => {
+      console.log(`[SOCKET] Sending test notification to user room: ${roomName}`);
+      socket.emit('test-notification', { 
+        message: 'Notification system connected successfully',
+        time: new Date().toISOString()
+      });
+    }, 2000); // Slight delay to ensure connection is stable
+  });
+  
+  // Handle specific request for test notification
+  socket.on('request-test-notification', (data) => {
+    if (data.userId) {
+      console.log(`[SOCKET] Received test notification request for user: ${data.userId}`);
+      const roomName = `user:${data.userId}`;
+      io.to(roomName).emit('test-notification', {
+        message: 'Test notification requested by client',
+        time: new Date().toISOString()
+      });
+    }
   });
   
   socket.on('join-project', (projectId) => {

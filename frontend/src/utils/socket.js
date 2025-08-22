@@ -38,25 +38,41 @@ export const initializeSocket = (store) => {
       socket.emit('join-tenant', tenantId);
     }
     
-    // Join user-specific room
-    const userData = localStorage.getItem('user');
-    if (userData) {
-      try {
+    // Join user-specific room from all possible sources
+    let userId = null;
+    
+    // Try localStorage
+    try {
+      const userData = localStorage.getItem('user');
+      if (userData) {
         const user = JSON.parse(userData);
         if (user && user._id) {
-          console.log('Joining user room:', `user:${user._id}`);
-          socket.emit('join-user-room', user._id);
+          userId = user._id;
+          console.log('Found user ID in localStorage:', userId);
         }
-      } catch (err) {
-        console.error('Error parsing user data for socket room:', err);
+      }
+    } catch (err) {
+      console.error('Error parsing user data from localStorage:', err);
+    }
+    
+    // Try Redux store if not found in localStorage
+    if (!userId) {
+      const currentUser = store.getState().auth.user;
+      if (currentUser && currentUser._id) {
+        userId = currentUser._id;
+        console.log('Found user ID in Redux store:', userId);
       }
     }
     
-    // Also get user from Redux store as backup
-    const currentUser = store.getState().auth.user;
-    if (currentUser && currentUser._id) {
-      console.log('Joining user room from Redux state:', `user:${currentUser._id}`);
-      socket.emit('join-user-room', currentUser._id);
+    // Join user room if we found a user ID
+    if (userId) {
+      console.log('Joining user room:', `user:${userId}`);
+      socket.emit('join-user-room', userId);
+      
+      // Also emit a request for test notification to verify connection
+      socket.emit('request-test-notification', { userId });
+    } else {
+      console.warn('No user ID found, cannot join user-specific room');
     }
   });
   
@@ -64,13 +80,26 @@ export const initializeSocket = (store) => {
     console.log('Socket disconnected');
   });
   
-  // Add test notification handler
+  // Add test notification handler with enhanced visibility
   socket.on('test-notification', (data) => {
-    console.log('Test notification received:', data);
+    console.log('📣 TEST NOTIFICATION RECEIVED:', data);
+    
+    // Always show test notifications visibly for debugging
     store.dispatch(showNotification({
       message: data.message || 'Test notification',
-      type: 'success',
-      relatedResource: null
+      type: 'warning', // Use warning color to make it more visible
+      relatedResource: null,
+      duration: 10000 // Show for longer (10 seconds)
+    }));
+    
+    // Also add to notification collection for debugging
+    store.dispatch(addNotification({
+      _id: new Date().getTime().toString(),
+      type: 'test',
+      title: 'Test Notification',
+      message: data.message || 'Test notification',
+      read: false,
+      createdAt: new Date().toISOString()
     }));
   });
   socket.on('task-updated', (data) => {
@@ -158,45 +187,52 @@ export const initializeSocket = (store) => {
   
   socket.on('notification', (data) => {
     try {
-      console.log('Received notification:', data);
+      console.log('📬 NOTIFICATION RECEIVED:', data);
       
       // Get current user ID from store
       const currentUserId = store.getState().auth.user?._id;
       
       if (!currentUserId) {
-        console.log('No currentUserId found, skipping notification');
+        console.log('⚠️ No currentUserId found, skipping notification');
         return;
       }
       
-      console.log('Current user ID:', currentUserId);
-      console.log('Notification recipient:', data?.recipient);
+      console.log('👤 Current user ID:', currentUserId);
+      console.log('🎯 Notification recipient:', data?.recipient);
       
-      // Check if notification is for current user
-      const isForCurrentUser = 
-        data?.recipient === currentUserId || 
-        data?.recipient?._id === currentUserId;
+      // Convert both IDs to strings for reliable comparison
+      const recipientId = typeof data?.recipient === 'object' ? 
+        data?.recipient?._id?.toString() : 
+        data?.recipient?.toString();
       
-      console.log('Is notification for current user:', isForCurrentUser);
+      const currentUserIdStr = currentUserId.toString();
       
-      // Only process notifications meant for this user
-      if (isForCurrentUser || !data.recipient) {
-        console.log('Processing notification for current user');
-        
-        // Add to notifications collection in Redux
-        store.dispatch(addNotification(data));
-        
-        // Show toast notification
-        console.log('Showing notification:', data.title || data.message);
-        store.dispatch(showNotification({
-          message: data.title || data.message || 'New notification',
-          type: 'info',
-          relatedResource: data.relatedResource || null
-        }));
-      } else {
-        console.log('Ignoring notification not intended for current user');
-      }
+      // Log the exact comparison values for debugging
+      console.log(`🔍 Comparing recipient ID: "${recipientId}" with current user ID: "${currentUserIdStr}"`);
+      
+      // Check if notification is for current user with string comparison
+      const isForCurrentUser = recipientId === currentUserIdStr;
+      
+      console.log('✓ Is notification for current user:', isForCurrentUser);
+      
+      // Always show notification during debugging to see what's happening
+      console.log('💬 Processing notification: ', data.title || data.message);
+      
+      // Add to notifications collection in Redux
+      store.dispatch(addNotification({
+        ...data,
+        _id: data._id || new Date().getTime().toString() // Ensure we have an ID
+      }));
+      
+      // Show toast notification
+      store.dispatch(showNotification({
+        message: data.title || data.message || 'New notification',
+        type: 'info',
+        relatedResource: data.relatedResource || null,
+        duration: 8000 // Show for 8 seconds to make sure it's seen
+      }));
     } catch (error) {
-      console.error('Error handling notification event:', error);
+      console.error('❌ Error handling notification event:', error);
     }
   });
   

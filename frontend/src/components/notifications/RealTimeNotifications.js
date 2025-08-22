@@ -56,17 +56,26 @@ const RealTimeNotifications = () => {
   return (
     <Snackbar
       anchorOrigin={{
-        vertical: 'bottom',
-        horizontal: 'right',
+        vertical: 'top', // Changed to top to make more visible
+        horizontal: 'center', // Changed to center to make more visible
       }}
       open={Boolean(notification.open)}
-      autoHideDuration={6000}
+      autoHideDuration={notification.duration || 6000}
       onClose={handleClose}
     >
       <Alert
         onClose={handleClose}
         severity={notification.type || 'info'}
-        sx={{ width: '100%', cursor: 'pointer' }}
+        variant="filled" // Make alerts more visible
+        elevation={6}
+        sx={{ 
+          width: '100%', 
+          minWidth: '300px',
+          cursor: 'pointer',
+          '& .MuiAlert-message': {
+            fontSize: '1rem', // Larger text
+          }
+        }}
         onClick={handleViewDetails}
         action={
           <IconButton

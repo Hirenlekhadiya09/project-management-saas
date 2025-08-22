@@ -76,8 +76,12 @@ exports.createTask = async (req, res) => {
       // Enable debugging to see socket events
       console.log(`Emitting notification to user:${req.body.assignedTo}`);
       
-      // Send to both user-specific room and tenant room for better reliability
-      io.to(`user:${req.body.assignedTo}`).emit('notification', {
+      // Send directly to user-specific room
+      const userRoom = `user:${req.body.assignedTo}`;
+      console.log(`[NOTIFICATION DEBUG] Emitting task-assigned notification to user room: ${userRoom}`);
+      
+      // Emit notification event to user's room
+      io.to(userRoom).emit('notification', {
         ...notification.toObject(),
         sender: {
           _id: req.user.id,
@@ -87,15 +91,17 @@ exports.createTask = async (req, res) => {
         recipient: req.body.assignedTo // Include recipient ID so client can filter
       });
       
-      // Also send to tenant room as backup
-      io.to(req.user.tenantId.toString()).emit('notification', {
-        ...notification.toObject(),
-        sender: {
-          _id: req.user.id,
-          name: req.user.name,
-          avatar: req.user.avatar
-        },
-        recipient: req.body.assignedTo // Include recipient ID so client can filter
+      // Also emit task-assigned event specifically for task assignments
+      io.to(userRoom).emit('task-assigned', {
+        task: task,
+        assignedTo: req.body.assignedTo,
+        tenantId: req.user.tenantId.toString()
+      });
+      
+      // Send a test notification to verify socket works
+      io.to(userRoom).emit('test-notification', { 
+        message: `Debug: Task "${task.title}" assigned to you`, 
+        time: new Date().toISOString() 
       });
       
       // Emit task-assigned event for real-time updates
@@ -354,6 +360,8 @@ exports.updateTask = async (req, res) => {
     const newAssignee = req.body.assignedTo && 
                        (!task.assignedTo || 
                         task.assignedTo.toString() !== req.body.assignedTo);
+                        
+    console.log(`Task assignment: Old assignee=${task.assignedTo}, New assignee=${req.body.assignedTo}, isNew=${newAssignee}`);
 
     // Update task
     task = await Task.findByIdAndUpdate(req.params.id, req.body, {
