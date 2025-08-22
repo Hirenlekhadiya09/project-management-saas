@@ -383,7 +383,12 @@ exports.updateTask = async (req, res) => {
       
       // Emit socket event for real-time notification
       const io = req.app.get('io');
-      io.to(req.user.tenantId.toString()).emit('notification', {
+      
+      // Send to the specific user's room
+      const userRoom = `user:${req.body.assignedTo}`;
+      console.log(`Emitting notification to user room: ${userRoom}`);
+      
+      io.to(userRoom).emit('notification', {
         ...notification.toObject(),
         sender: {
           _id: req.user.id,
@@ -392,8 +397,8 @@ exports.updateTask = async (req, res) => {
         }
       });
       
-      // Also emit task-assigned event for real-time updates
-      io.to(req.user.tenantId.toString()).emit('task-assigned', {
+      // Also emit task-assigned event for real-time updates to the specific user
+      io.to(userRoom).emit('task-assigned', {
         task: task,
         assignedTo: req.body.assignedTo,
         tenantId: req.user.tenantId.toString()
