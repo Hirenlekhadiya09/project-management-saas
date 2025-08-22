@@ -25,7 +25,8 @@ import {
   getNotifications, 
   markAsRead, 
   markAllAsRead,
-  deleteNotification
+  deleteNotification,
+  clearAllNotifications
 } from '../../features/notifications/notificationSlice';
 import { formatDistanceToNow } from 'date-fns';
 
@@ -50,6 +51,12 @@ const NotificationsMenu = ({ anchorEl, open, onClose }) => {
   const handleDelete = (id) => {
     setSelectedId(id);
     dispatch(deleteNotification(id));
+  };
+  
+  const handleClearAll = () => {
+    if (window.confirm('Are you sure you want to clear all notifications?')) {
+      dispatch(clearAllNotifications());
+    }
   };
   
   const handleNavigate = (notification) => {
@@ -113,15 +120,17 @@ const NotificationsMenu = ({ anchorEl, open, onClose }) => {
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
-          p: 1,
+          p: 1.5,
           px: 2,
+          backgroundColor: theme => theme.palette.primary.main,
+          color: 'white'
         }}
       >
         <Typography variant="h6" sx={{ fontWeight: 'bold' }}>
           Notifications {unreadCount > 0 && `(${unreadCount})`}
         </Typography>
         <Box>
-          <IconButton size="small" onClick={handleRefresh}>
+          <IconButton size="small" onClick={handleRefresh} sx={{ color: 'white' }}>
             <RefreshIcon fontSize="small" />
           </IconButton>
         </Box>
@@ -141,7 +150,11 @@ const NotificationsMenu = ({ anchorEl, open, onClose }) => {
               selected={notification._id === selectedId}
               sx={{
                 backgroundColor: notification.read ? 'transparent' : 'rgba(25, 118, 210, 0.08)',
+                borderLeft: notification.read ? 'none' : '4px solid #1890ff',
                 whiteSpace: 'normal',
+                '&:hover': {
+                  backgroundColor: theme => theme.palette.action.hover
+                }
               }}
             >
               <ListItemIcon>{getNotificationIcon(notification.type)}</ListItemIcon>
@@ -196,17 +209,29 @@ const NotificationsMenu = ({ anchorEl, open, onClose }) => {
       
       <Divider />
       
-      {unreadCount > 0 && (
-        <Box sx={{ display: 'flex', justifyContent: 'center', p: 1 }}>
+      <Box sx={{ display: 'flex', justifyContent: 'center', p: 1, gap: 2 }}>
+        {unreadCount > 0 && (
           <Button 
             size="small" 
             onClick={handleMarkAllAsRead}
             disabled={isLoading}
+            color="primary"
           >
             Mark all as read
           </Button>
-        </Box>
-      )}
+        )}
+        
+        {notifications.length > 0 && (
+          <Button 
+            size="small" 
+            onClick={handleClearAll}
+            disabled={isLoading}
+            color="error"
+          >
+            Clear all
+          </Button>
+        )}
+      </Box>
     </Menu>
   );
 };

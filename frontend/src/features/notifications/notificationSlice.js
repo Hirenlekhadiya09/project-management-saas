@@ -90,6 +90,24 @@ export const deleteNotification = createAsyncThunk(
   }
 );
 
+// Clear all notifications
+export const clearAllNotifications = createAsyncThunk(
+  'notifications/clearAll',
+  async (_, thunkAPI) => {
+    try {
+      const response = await api.delete('/notifications/clear-all');
+      return { count: response.data.count };
+    } catch (error) {
+      const message = 
+        error.response?.data?.message || 
+        error.message || 
+        'Something went wrong';
+      
+      return thunkAPI.rejectWithValue(message);
+    }
+  }
+);
+
 export const notificationSlice = createSlice({
   name: 'notifications',
   initialState,
@@ -191,6 +209,21 @@ export const notificationSlice = createSlice({
         );
       })
       .addCase(deleteNotification.rejected, (state, action) => {
+        state.isLoading = false;
+        state.error = action.payload;
+      })
+      
+      // Clear all notifications
+      .addCase(clearAllNotifications.pending, (state) => {
+        state.isLoading = true;
+        state.error = null;
+      })
+      .addCase(clearAllNotifications.fulfilled, (state) => {
+        state.isLoading = false;
+        state.notifications = []; // Clear all notifications
+        state.unreadCount = 0; // Reset unread count
+      })
+      .addCase(clearAllNotifications.rejected, (state, action) => {
         state.isLoading = false;
         state.error = action.payload;
       });

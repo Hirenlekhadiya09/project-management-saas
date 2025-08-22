@@ -3,7 +3,8 @@ const {
   getNotifications,
   markAsRead,
   markAllAsRead,
-  deleteNotification
+  deleteNotification,
+  clearAllNotifications
 } = require('../controllers/notificationController');
 
 const router = express.Router();
@@ -24,6 +25,8 @@ router.route('/')
 
 router.post('/read', markAsRead);
 router.post('/read-all', markAllAsRead);
+
+router.delete('/clear-all', clearAllNotifications);
 
 router.route('/:id')
   .delete(deleteNotification);

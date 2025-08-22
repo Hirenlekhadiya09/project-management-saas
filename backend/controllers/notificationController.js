@@ -143,11 +143,36 @@ exports.deleteNotification = async (req, res) => {
       });
     }
 
-    await notification.remove();
+    await notification.deleteOne();
 
     res.status(200).json({
       success: true,
       data: {}
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: 'Server error',
+      error: error.message
+    });
+  }
+};
+
+// @desc    Clear all notifications (delete all)
+// @route   DELETE /api/notifications/clear-all
+// @access  Private
+exports.clearAllNotifications = async (req, res) => {
+  try {
+    // Delete all notifications for the current user
+    const result = await Notification.deleteMany({
+      recipient: req.user.id,
+      tenantId: req.user.tenantId
+    });
+
+    res.status(200).json({
+      success: true,
+      count: result.deletedCount,
+      message: `${result.deletedCount} notifications cleared`
     });
   } catch (error) {
     res.status(500).json({
