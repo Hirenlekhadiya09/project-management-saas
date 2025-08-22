@@ -134,40 +134,77 @@ app.set('io', io);
 
 // Socket.io connection
 io.on('connection', (socket) => {
-  console.log('New client connected');
+  console.log('New client connected with ID:', socket.id);
+  
+  // Debug all socket events for development
+  const debugSocketEvent = (event, data) => {
+    console.log(`Socket event '${event}' received:`, JSON.stringify(data));
+  };
+  
+  // Debug middleware to log all events
+  socket.onAny((event, ...args) => {
+    console.log(`Socket event received: ${event}`, args);
+  });
   
   socket.on('join-tenant', (tenantId) => {
+    if (!tenantId) return;
+    
     socket.join(tenantId);
-    console.log(`Client joined room: ${tenantId}`);
+    console.log(`Client ${socket.id} joined tenant room: ${tenantId}`);
+    
+    // Confirm room join
+    socket.emit('joined-tenant', { tenantId });
   });
   
   socket.on('join-user-room', (userId) => {
-    if (userId) {
-      socket.join(`user:${userId}`);
-      console.log(`Client joined user room: user:${userId}`);
-    }
+    if (!userId) return;
+    
+    const roomName = `user:${userId}`;
+    socket.join(roomName);
+    console.log(`Client ${socket.id} joined user room: ${roomName}`);
+    
+    // Confirm room join and test notification
+    socket.emit('joined-user-room', { userId, roomName });
+    socket.emit('test-notification', { 
+      message: 'Successfully connected to notification system',
+      time: new Date().toISOString()
+    });
   });
   
   socket.on('join-project', (projectId) => {
+    if (!projectId) return;
+    
     socket.join(projectId);
-    console.log(`Client joined project: ${projectId}`);
+    console.log(`Client ${socket.id} joined project room: ${projectId}`);
+    
+    // Confirm room join
+    socket.emit('joined-project', { projectId });
   });
   
   socket.on('task-update', (data) => {
+    debugSocketEvent('task-update', data);
     io.to(data.projectId).emit('task-updated', data);
   });
   
   socket.on('task-assigned', (data) => {
-    // Emit to specific user's room if available, otherwise to tenant
+    debugSocketEvent('task-assigned', data);
+    
+    // Emit to specific user's room if available
     if (data.assignedTo && data.assignedTo._id) {
-      io.to(`user:${data.assignedTo._id}`).emit('task-assigned', data);
+      const userRoom = `user:${data.assignedTo._id}`;
+      console.log(`Emitting task-assigned to ${userRoom}`);
+      io.to(userRoom).emit('task-assigned', data);
     }
+    
     // Also emit to tenant for backup
-    io.to(data.tenantId).emit('task-assigned', data);
+    if (data.tenantId) {
+      console.log(`Emitting task-assigned to tenant ${data.tenantId}`);
+      io.to(data.tenantId).emit('task-assigned', data);
+    }
   });
   
   socket.on('disconnect', () => {
-    console.log('Client disconnected');
+    console.log(`Client disconnected: ${socket.id}`);
   });
 });
 

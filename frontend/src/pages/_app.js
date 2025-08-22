@@ -104,10 +104,20 @@ function MyApp({ Component, pageProps, emotionCache = clientSideEmotionCache }) 
     store.dispatch(initUI());
     
     // Initialize socket connection
+    console.log('Initializing socket in _app.js');
     socket = initializeSocket(store);
+    
+    // Periodically check and reconnect socket if needed
+    const socketCheckInterval = setInterval(() => {
+      if (!socket || !socket.connected) {
+        console.log('Socket disconnected, attempting to reconnect');
+        socket = initializeSocket(store);
+      }
+    }, 10000); // Check every 10 seconds
     
     // Clean up socket on unmount
     return () => {
+      clearInterval(socketCheckInterval);
       disconnectSocket();
     };
   }, []);

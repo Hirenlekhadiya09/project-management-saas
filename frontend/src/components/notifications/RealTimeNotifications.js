@@ -7,7 +7,7 @@ import { showNotification, hideNotification } from '../../features/ui/uiSlice';
 import { useRouter } from 'next/router';
 
 // For debugging
-const DEBUG = false;
+const DEBUG = true; // Enable debugging to track notifications
 
 const RealTimeNotifications = () => {
   const dispatch = useDispatch();

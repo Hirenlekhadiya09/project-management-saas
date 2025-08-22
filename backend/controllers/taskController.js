@@ -73,8 +73,22 @@ exports.createTask = async (req, res) => {
       // Emit socket event for real-time notification
       const io = req.app.get('io');
       
-      // Send directly to the specific user's socket room
+      // Enable debugging to see socket events
+      console.log(`Emitting notification to user:${req.body.assignedTo}`);
+      
+      // Send to both user-specific room and tenant room for better reliability
       io.to(`user:${req.body.assignedTo}`).emit('notification', {
+        ...notification.toObject(),
+        sender: {
+          _id: req.user.id,
+          name: req.user.name,
+          avatar: req.user.avatar
+        },
+        recipient: req.body.assignedTo // Include recipient ID so client can filter
+      });
+      
+      // Also send to tenant room as backup
+      io.to(req.user.tenantId.toString()).emit('notification', {
         ...notification.toObject(),
         sender: {
           _id: req.user.id,
@@ -89,8 +103,11 @@ exports.createTask = async (req, res) => {
         .populate('project', 'name')
         .lean();
         
-      // Send directly to the specific user's socket room
-      io.to(`user:${req.body.assignedTo}`).emit('task-assigned', {
+      // Log for debugging
+      console.log(`Emitting task-assigned event to user:${req.body.assignedTo}`);
+      
+      // Send to both user-specific room and tenant room for reliability
+      const taskAssignedPayload = {
         task: populatedTask,
         assignedTo: {
           _id: req.body.assignedTo, // Ensure the ID is properly included
@@ -106,7 +123,13 @@ exports.createTask = async (req, res) => {
           avatar: req.user.avatar
         },
         tenantId: req.user.tenantId.toString()
-      });
+      };
+      
+      // Send to user's room
+      io.to(`user:${req.body.assignedTo}`).emit('task-assigned', taskAssignedPayload);
+      
+      // Also send to tenant room for backup
+      io.to(req.user.tenantId.toString()).emit('task-assigned', taskAssignedPayload);
       
       // Send email notification
       try {

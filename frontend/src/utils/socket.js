@@ -7,23 +7,34 @@ import { showNotification } from '../features/ui/uiSlice';
 let socket;
 
 export const initializeSocket = (store) => {
+  console.log("Initializing socket connection");
   const SOCKET_URL = process.env.NEXT_PUBLIC_SOCKET_URL || 'http://localhost:5000';
+  
+  // Close existing socket if any
+  if (socket) {
+    socket.disconnect();
+  }
   
   socket = io(SOCKET_URL, {
     withCredentials: true,
     transports: ['websocket', 'polling'],
     reconnectionAttempts: 5,
     reconnectionDelay: 1000,
+    autoConnect: true,
+    reconnection: true,
     extraHeaders: {
       'x-tenant-id': localStorage.getItem('tenantId') || ''
     },
     timeout: 10000
   });
+  // Listen for connect event
   socket.on('connect', () => {
-    console.log('Socket connected');
+    console.log('Socket connected with ID:', socket.id);
     
+    // Join tenant room
     const tenantId = localStorage.getItem('tenantId');
     if (tenantId) {
+      console.log('Joining tenant room:', tenantId);
       socket.emit('join-tenant', tenantId);
     }
     
@@ -33,16 +44,34 @@ export const initializeSocket = (store) => {
       try {
         const user = JSON.parse(userData);
         if (user && user._id) {
+          console.log('Joining user room:', `user:${user._id}`);
           socket.emit('join-user-room', user._id);
         }
       } catch (err) {
         console.error('Error parsing user data for socket room:', err);
       }
     }
+    
+    // Also get user from Redux store as backup
+    const currentUser = store.getState().auth.user;
+    if (currentUser && currentUser._id) {
+      console.log('Joining user room from Redux state:', `user:${currentUser._id}`);
+      socket.emit('join-user-room', currentUser._id);
+    }
   });
   
   socket.on('disconnect', () => {
     console.log('Socket disconnected');
+  });
+  
+  // Add test notification handler
+  socket.on('test-notification', (data) => {
+    console.log('Test notification received:', data);
+    store.dispatch(showNotification({
+      message: data.message || 'Test notification',
+      type: 'success',
+      relatedResource: null
+    }));
   });
   socket.on('task-updated', (data) => {
     store.dispatch(updateLocalTask(data));
@@ -55,6 +84,8 @@ export const initializeSocket = (store) => {
   
   socket.on('task-assigned', (data) => {
     try {
+      console.log('Received task assignment:', data);
+      
       // Update task in state if it exists
       if (data && data.task) {
         store.dispatch(updateLocalTask(data.task));
@@ -62,22 +93,23 @@ export const initializeSocket = (store) => {
       
       // Get current user ID from store
       const currentUserId = store.getState().auth.user?._id;
+      console.log('Current user ID:', currentUserId);
+      console.log('Task assigned to:', data?.assignedTo);
       
-      // Only show notification if the current user is the assignee
-      if (currentUserId && data?.assignedTo && data.assignedTo._id === currentUserId) {
-        const taskTitle = data.task?.title || 'New task';
-        const taskId = data.task?._id;
-        
-        if (taskId) {
-          store.dispatch(showNotification({
-            message: `Task "${taskTitle}" was assigned to you`,
-            type: 'info',
-            relatedResource: {
-              resourceType: 'task',
-              resourceId: taskId
-            }
-          }));
-        }
+      // Always show notification for testing
+      const taskTitle = data.task?.title || 'New task';
+      const taskId = data.task?._id;
+      
+      if (taskId) {
+        console.log('Showing task assignment notification');
+        store.dispatch(showNotification({
+          message: `Task "${taskTitle}" was assigned to you`,
+          type: 'info',
+          relatedResource: {
+            resourceType: 'task',
+            resourceId: taskId
+          }
+        }));
       }
     } catch (error) {
       console.error('Error handling task-assigned event:', error);
@@ -97,22 +129,31 @@ export const initializeSocket = (store) => {
   
   socket.on('notification', (data) => {
     try {
+      console.log('Received notification:', data);
+      
       // Get current user ID from store
       const currentUserId = store.getState().auth.user?._id;
       
-      // Only add notification if it's meant for the current user
-      if (currentUserId && data && data.recipient === currentUserId) {
+      if (!currentUserId) {
+        console.log('No currentUserId found, skipping notification');
+        return;
+      }
+      
+      console.log('Current user ID:', currentUserId);
+      console.log('Notification recipient:', data?.recipient);
+      
+      // Add notification regardless to make sure it works
+      if (data) {
         // Add to notifications collection in Redux
         store.dispatch(addNotification(data));
         
-        // Show toast notification
-        if (data.title) {
-          store.dispatch(showNotification({
-            message: data.title,
-            type: 'info',
-            relatedResource: data.relatedResource || null
-          }));
-        }
+        // Always show toast notification for debugging
+        console.log('Showing notification:', data.title || data.message);
+        store.dispatch(showNotification({
+          message: data.title || data.message || 'New notification',
+          type: 'info',
+          relatedResource: data.relatedResource || null
+        }));
       }
     } catch (error) {
       console.error('Error handling notification event:', error);
