@@ -141,6 +141,13 @@ io.on('connection', (socket) => {
     console.log(`Client joined room: ${tenantId}`);
   });
   
+  socket.on('join-user-room', (userId) => {
+    if (userId) {
+      socket.join(`user:${userId}`);
+      console.log(`Client joined user room: user:${userId}`);
+    }
+  });
+  
   socket.on('join-project', (projectId) => {
     socket.join(projectId);
     console.log(`Client joined project: ${projectId}`);
@@ -151,7 +158,11 @@ io.on('connection', (socket) => {
   });
   
   socket.on('task-assigned', (data) => {
-    // Emit to specific user's tenant room
+    // Emit to specific user's room if available, otherwise to tenant
+    if (data.assignedTo && data.assignedTo._id) {
+      io.to(`user:${data.assignedTo._id}`).emit('task-assigned', data);
+    }
+    // Also emit to tenant for backup
     io.to(data.tenantId).emit('task-assigned', data);
   });
   

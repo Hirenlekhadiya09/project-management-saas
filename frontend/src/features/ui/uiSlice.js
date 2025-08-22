@@ -50,21 +50,34 @@ export const uiSlice = createSlice({
       }
     },
     showNotification: (state, action) => {
-      // Legacy notifications array
-      state.notifications.push({
-        id: Date.now(),
-        message: action.payload.message,
-        type: action.payload.type || 'info',
-      });
-      
-      // New notification system for snackbar
-      state.notification = {
-        open: true,
-        message: action.payload.message,
-        type: action.payload.type || 'info',
-        relatedResource: action.payload.relatedResource || null,
-        duration: action.payload.duration || 5000,
-      };
+      // Safely handle the case when payload might be malformed
+      try {
+        // Legacy notifications array
+        state.notifications.push({
+          id: Date.now(),
+          message: action.payload?.message || '',
+          type: (action.payload && action.payload.type) || 'info',
+        });
+        
+        // New notification system for snackbar
+        state.notification = {
+          open: true,
+          message: action.payload?.message || '',
+          type: (action.payload && action.payload.type) || 'info',
+          relatedResource: (action.payload && action.payload.relatedResource) || null,
+          duration: (action.payload && action.payload.duration) || 5000,
+        };
+      } catch (error) {
+        console.error('Error in showNotification reducer:', error);
+        // Fallback to a safe default state
+        state.notification = {
+          open: true,
+          message: 'New notification received',
+          type: 'info',
+          relatedResource: null,
+          duration: 5000,
+        };
+      }
     },
     removeNotification: (state, action) => {
       state.notifications = state.notifications.filter(
@@ -92,7 +105,19 @@ export const uiSlice = createSlice({
       }
     },
     hideNotification: (state) => {
-      state.notification.open = false;
+      // Ensure notification object exists before modifying it
+      if (state.notification) {
+        state.notification.open = false;
+      } else {
+        // If notification is somehow undefined, recreate it
+        state.notification = {
+          open: false,
+          message: '',
+          type: 'info',
+          relatedResource: null,
+          duration: 5000,
+        };
+      }
     },
   },
 });

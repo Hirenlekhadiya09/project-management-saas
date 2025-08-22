@@ -6,10 +6,28 @@ import { addNotification } from '../../features/notifications/notificationSlice'
 import { showNotification, hideNotification } from '../../features/ui/uiSlice';
 import { useRouter } from 'next/router';
 
+// For debugging
+const DEBUG = false;
+
 const RealTimeNotifications = () => {
   const dispatch = useDispatch();
   const router = useRouter();
-  const { notification, open } = useSelector((state) => state.ui.notification || { notification: null, open: false });
+  const uiState = useSelector((state) => state.ui);
+  
+  // Make sure the notification object exists with proper structure
+  const notification = uiState?.notification || { 
+    open: false, 
+    message: '', 
+    type: 'info',
+    relatedResource: null
+  };
+  
+  // Log for debugging
+  useEffect(() => {
+    if (DEBUG) {
+      console.log('RealTimeNotifications rendered with:', { notification, uiState });
+    }
+  }, [notification, uiState]);
   
   const handleClose = (event, reason) => {
     if (reason === 'clickaway') {
@@ -19,21 +37,21 @@ const RealTimeNotifications = () => {
   };
   
   const handleViewDetails = () => {
-    if (notification && notification.relatedResource) {
-      const { resourceType, resourceId } = notification.relatedResource;
-      
-      if (resourceType === 'task') {
-        router.push(`/tasks/${resourceId}`);
-      } else if (resourceType === 'project') {
-        router.push(`/projects/${resourceId}`);
+    try {
+      if (notification.relatedResource) {
+        const { resourceType, resourceId } = notification.relatedResource;
+        
+        if (resourceType === 'task') {
+          router.push(`/tasks/${resourceId}`);
+        } else if (resourceType === 'project') {
+          router.push(`/projects/${resourceId}`);
+        }
       }
+    } catch (error) {
+      console.error('Error handling notification click:', error);
     }
     dispatch(hideNotification());
   };
-
-  if (!notification || typeof notification !== 'object') {
-    return null;
-  }
   
   return (
     <Snackbar
@@ -41,25 +59,13 @@ const RealTimeNotifications = () => {
         vertical: 'bottom',
         horizontal: 'right',
       }}
-      open={Boolean(open)}
+      open={Boolean(notification.open)}
       autoHideDuration={6000}
       onClose={handleClose}
-      action={
-        <>
-          <IconButton
-            size="small"
-            aria-label="close"
-            color="inherit"
-            onClick={handleClose}
-          >
-            <CloseIcon fontSize="small" />
-          </IconButton>
-        </>
-      }
     >
       <Alert
         onClose={handleClose}
-        severity={notification?.type || 'info'}
+        severity={notification.type || 'info'}
         sx={{ width: '100%', cursor: 'pointer' }}
         onClick={handleViewDetails}
         action={
@@ -67,13 +73,16 @@ const RealTimeNotifications = () => {
             size="small"
             aria-label="close"
             color="inherit"
-            onClick={handleClose}
+            onClick={(e) => {
+              e.stopPropagation(); // Prevent triggering onClick of parent Alert
+              handleClose(e);
+            }}
           >
             <CloseIcon fontSize="small" />
           </IconButton>
         }
       >
-        {notification?.message}
+        {notification.message || ''}
       </Alert>
     </Snackbar>
   );

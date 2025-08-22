@@ -54,24 +54,33 @@ export const initializeSocket = (store) => {
   });
   
   socket.on('task-assigned', (data) => {
-    // Update task in state if it exists
-    if (data.task) {
-      store.dispatch(updateLocalTask(data.task));
-    }
-    
-    // Get current user ID from store
-    const currentUserId = store.getState().auth.user?._id;
-    
-    // Only show notification if the current user is the assignee
-    if (currentUserId && data.assignedTo && data.assignedTo._id === currentUserId) {
-      store.dispatch(showNotification({
-        message: `Task "${data.task.title}" was assigned to you`,
-        type: 'info',
-        relatedResource: {
-          resourceType: 'task',
-          resourceId: data.task._id
+    try {
+      // Update task in state if it exists
+      if (data && data.task) {
+        store.dispatch(updateLocalTask(data.task));
+      }
+      
+      // Get current user ID from store
+      const currentUserId = store.getState().auth.user?._id;
+      
+      // Only show notification if the current user is the assignee
+      if (currentUserId && data?.assignedTo && data.assignedTo._id === currentUserId) {
+        const taskTitle = data.task?.title || 'New task';
+        const taskId = data.task?._id;
+        
+        if (taskId) {
+          store.dispatch(showNotification({
+            message: `Task "${taskTitle}" was assigned to you`,
+            type: 'info',
+            relatedResource: {
+              resourceType: 'task',
+              resourceId: taskId
+            }
+          }));
         }
-      }));
+      }
+    } catch (error) {
+      console.error('Error handling task-assigned event:', error);
     }
   });
   
@@ -87,18 +96,26 @@ export const initializeSocket = (store) => {
   });
   
   socket.on('notification', (data) => {
-    // Get current user ID from store
-    const currentUserId = store.getState().auth.user?._id;
-    
-    // Only add notification if it's meant for the current user
-    if (currentUserId && data.recipient === currentUserId) {
-      store.dispatch(addNotification(data));
+    try {
+      // Get current user ID from store
+      const currentUserId = store.getState().auth.user?._id;
       
-      store.dispatch(showNotification({
-        message: data.title,
-        type: 'info',
-        relatedResource: data.relatedResource
-      }));
+      // Only add notification if it's meant for the current user
+      if (currentUserId && data && data.recipient === currentUserId) {
+        // Add to notifications collection in Redux
+        store.dispatch(addNotification(data));
+        
+        // Show toast notification
+        if (data.title) {
+          store.dispatch(showNotification({
+            message: data.title,
+            type: 'info',
+            relatedResource: data.relatedResource || null
+          }));
+        }
+      }
+    } catch (error) {
+      console.error('Error handling notification event:', error);
     }
   });
   

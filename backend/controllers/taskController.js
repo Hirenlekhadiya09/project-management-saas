@@ -72,13 +72,16 @@ exports.createTask = async (req, res) => {
       
       // Emit socket event for real-time notification
       const io = req.app.get('io');
-      io.to(req.user.tenantId.toString()).emit('notification', {
+      
+      // Send directly to the specific user's socket room
+      io.to(`user:${req.body.assignedTo}`).emit('notification', {
         ...notification.toObject(),
         sender: {
           _id: req.user.id,
           name: req.user.name,
           avatar: req.user.avatar
-        }
+        },
+        recipient: req.body.assignedTo // Include recipient ID so client can filter
       });
       
       // Emit task-assigned event for real-time updates
@@ -86,9 +89,17 @@ exports.createTask = async (req, res) => {
         .populate('project', 'name')
         .lean();
         
-      io.to(req.user.tenantId.toString()).emit('task-assigned', {
+      // Send directly to the specific user's socket room
+      io.to(`user:${req.body.assignedTo}`).emit('task-assigned', {
         task: populatedTask,
-        assignedTo: assignedUser,
+        assignedTo: {
+          _id: req.body.assignedTo, // Ensure the ID is properly included
+          ...(assignedUser ? { 
+            name: assignedUser.name,
+            email: assignedUser.email,
+            avatar: assignedUser.avatar
+          } : {})
+        },
         assignedBy: {
           _id: req.user.id,
           name: req.user.name,

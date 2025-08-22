@@ -1,6 +1,11 @@
 import { useEffect, useState } from 'react';
 import { useSelector } from 'react-redux';
-import RealTimeNotifications from './RealTimeNotifications';
+import dynamic from 'next/dynamic';
+
+// Dynamically import RealTimeNotifications with no SSR to avoid hydration issues
+const RealTimeNotifications = dynamic(() => import('./RealTimeNotifications'), { 
+  ssr: false 
+});
 
 // This is a wrapper component that will only render in client-side
 const RealTimeNotificationsWrapper = () => {
