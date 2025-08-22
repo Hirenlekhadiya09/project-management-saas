@@ -129,6 +129,9 @@ app.use('/api/v1/notifications', notificationRoutes);
 app.use('/api/v1/users', userRoutes);
 app.use('/api/v1/tenants', require('./routes/tenantRoutes'));
 
+// Make io available to routes
+app.set('io', io);
+
 // Socket.io connection
 io.on('connection', (socket) => {
   console.log('New client connected');
@@ -145,6 +148,11 @@ io.on('connection', (socket) => {
   
   socket.on('task-update', (data) => {
     io.to(data.projectId).emit('task-updated', data);
+  });
+  
+  socket.on('task-assigned', (data) => {
+    // Emit to specific user's tenant room
+    io.to(data.tenantId).emit('task-assigned', data);
   });
   
   socket.on('disconnect', () => {

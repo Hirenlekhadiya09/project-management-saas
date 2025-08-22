@@ -40,6 +40,19 @@ export const initializeSocket = (store) => {
     }));
   });
   
+  socket.on('task-assigned', (data) => {
+    // Update task in state if it exists
+    if (data.task) {
+      store.dispatch(updateLocalTask(data.task));
+    }
+    
+    // Show notification for the assignment
+    store.dispatch(showNotification({
+      message: `Task "${data.task.title}" was assigned to you`,
+      type: 'info'
+    }));
+  });
+  
   socket.on('project-updated', (data) => {
     // Update project in state
     store.dispatch(updateLocalProject(data));
@@ -78,6 +91,12 @@ export const leaveProjectRoom = (projectId) => {
 export const emitTaskUpdate = (taskData) => {
   if (socket) {
     socket.emit('task-update', taskData);
+  }
+};
+
+export const emitTaskAssigned = (taskData) => {
+  if (socket) {
+    socket.emit('task-assigned', taskData);
   }
 };
 

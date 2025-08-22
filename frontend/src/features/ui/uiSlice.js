@@ -5,6 +5,12 @@ const initialState = {
   darkMode: false,
   notifications: [],
   isMobile: false,
+  notification: {
+    open: false,
+    message: '',
+    type: 'info',
+    relatedResource: null,
+  },
 };
 
 export const uiSlice = createSlice({
@@ -44,12 +50,21 @@ export const uiSlice = createSlice({
       }
     },
     showNotification: (state, action) => {
+      // Legacy notifications array
       state.notifications.push({
         id: Date.now(),
         message: action.payload.message,
         type: action.payload.type || 'info',
-        duration: action.payload.duration || 5000,
       });
+      
+      // New notification system for snackbar
+      state.notification = {
+        open: true,
+        message: action.payload.message,
+        type: action.payload.type || 'info',
+        relatedResource: action.payload.relatedResource || null,
+        duration: action.payload.duration || 5000,
+      };
     },
     removeNotification: (state, action) => {
       state.notifications = state.notifications.filter(
@@ -75,7 +90,10 @@ export const uiSlice = createSlice({
           state.sidebarOpen = false;
         }
       }
-    }
+    },
+    hideNotification: (state) => {
+      state.notification.open = false;
+    },
   },
 });
 
@@ -86,6 +104,7 @@ export const {
   setDarkMode,
   showNotification,
   removeNotification,
+  hideNotification,
   setIsMobile,
   initUI
 } = uiSlice.actions;

@@ -54,7 +54,7 @@ exports.createTask = async (req, res) => {
     if (req.body.assignedTo) {
       // Create in-app notification
       const project = await Project.findById(req.body.project, 'name');
-      await Notification.create({
+      const notification = await Notification.create({
         type: 'task_assigned',
         title: 'New task assigned',
         message: `You have been assigned to task: "${task.title}" in project "${project.name}" with ${task.priority} priority${task.dueDate ? ` due by ${new Date(task.dueDate).toLocaleDateString()}` : ''}`,
@@ -65,6 +65,36 @@ exports.createTask = async (req, res) => {
           resourceId: task._id
         },
         tenantId: req.user.tenantId
+      });
+      
+      // Get the assigned user for inclusion in socket event
+      const assignedUser = await User.findById(req.body.assignedTo).select('name email avatar');
+      
+      // Emit socket event for real-time notification
+      const io = req.app.get('io');
+      io.to(req.user.tenantId.toString()).emit('notification', {
+        ...notification.toObject(),
+        sender: {
+          _id: req.user.id,
+          name: req.user.name,
+          avatar: req.user.avatar
+        }
+      });
+      
+      // Emit task-assigned event for real-time updates
+      const populatedTask = await Task.findById(task._id)
+        .populate('project', 'name')
+        .lean();
+        
+      io.to(req.user.tenantId.toString()).emit('task-assigned', {
+        task: populatedTask,
+        assignedTo: assignedUser,
+        assignedBy: {
+          _id: req.user.id,
+          name: req.user.name,
+          avatar: req.user.avatar
+        },
+        tenantId: req.user.tenantId.toString()
       });
       
       // Send email notification
@@ -304,7 +334,7 @@ exports.updateTask = async (req, res) => {
     // If task was assigned to a new user, create notification
     if (newAssignee) {
       // Create in-app notification
-      await Notification.create({
+      const notification = await Notification.create({
         type: 'task_assigned',
         title: 'Task assigned to you',
         message: `You have been assigned to task: "${task.title}" in project "${task.project.name}" with ${task.priority} priority${task.dueDate ? ` due by ${new Date(task.dueDate).toLocaleDateString()}` : ''}`,
@@ -315,6 +345,24 @@ exports.updateTask = async (req, res) => {
           resourceId: task._id
         },
         tenantId: req.user.tenantId
+      });
+      
+      // Emit socket event for real-time notification
+      const io = req.app.get('io');
+      io.to(req.user.tenantId.toString()).emit('notification', {
+        ...notification.toObject(),
+        sender: {
+          _id: req.user.id,
+          name: req.user.name,
+          avatar: req.user.avatar
+        }
+      });
+      
+      // Also emit task-assigned event for real-time updates
+      io.to(req.user.tenantId.toString()).emit('task-assigned', {
+        task: task,
+        assignedTo: req.body.assignedTo,
+        tenantId: req.user.tenantId.toString()
       });
       
       // Send email notification for task reassignment
@@ -371,7 +419,7 @@ The Task Management Team
             const manager = await User.findById(project.manager);
             
             // Create in-app notification for project manager
-            await Notification.create({
+            const notification = await Notification.create({
               type: 'task_completed',
               title: 'Task completed',
               message: `Task "${task.title}" in project "${task.project.name}" has been marked as completed`,
@@ -383,6 +431,20 @@ The Task Management Team
               },
               tenantId: req.user.tenantId
             });
+            
+            // Emit real-time notification to project manager
+            const io = req.app.get('io');
+            io.to(req.user.tenantId.toString()).emit('notification', {
+              ...notification.toObject(),
+              sender: {
+                _id: req.user.id,
+                name: req.user.name,
+                avatar: req.user.avatar
+              }
+            });
+            
+            // Emit task-update event for real-time updates
+            io.to(project._id.toString()).emit('task-updated', task);
             
             // Send email to project manager
             if (manager && manager.email) {

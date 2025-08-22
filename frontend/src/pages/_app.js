@@ -10,6 +10,7 @@ import store from '../store';
 import { initUI } from '../features/ui/uiSlice';
 import { loginSuccess } from '../features/auth/authSlice';
 import { initializeSocket, disconnectSocket } from '../utils/socket';
+import RealTimeNotificationsWrapper from '../components/notifications/RealTimeNotificationsWrapper';
 import '../styles/globals.css';
 
 // Create a client-side emotion cache
@@ -139,6 +140,10 @@ function MyApp({ Component, pageProps, emotionCache = clientSideEmotionCache }) 
           </Head>
           <AuthChecker>
             {getLayout(<Component {...pageProps} />)}
+            {/* Real-time notification component */}
+            <div id="notifications-container">
+              <RealTimeNotificationsWrapper />
+            </div>
           </AuthChecker>
         </ThemeProvider>
       </Provider>
