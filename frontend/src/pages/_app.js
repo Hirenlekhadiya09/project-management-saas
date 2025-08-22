@@ -23,12 +23,33 @@ const clientSideEmotionCache = createEmotionCache();
 
 let socket;
 
+// Import the socket handler
+import SocketHandler from '../components/socket/SocketHandler';
+
 // Auth checker component that verifies authentication state
 function AuthChecker({ children }) {
   const router = useRouter();
   const dispatch = useDispatch();
   const { isAuthenticated, user, token } = useSelector(state => state.auth);
   const [verified, setVerified] = useState(false);
+  const [prevAuthState, setPrevAuthState] = useState(false);
+  
+  // Track authentication changes
+  useEffect(() => {
+    // If authentication state changed from false to true
+    if (isAuthenticated && !prevAuthState) {
+      console.log('🔐 Authentication state changed: User logged in');
+      
+      // Initialize socket connection
+      if (window.__REDUX_STORE__ && user?._id) {
+        console.log('🔌 Re-initializing socket after login');
+        socket = initializeSocket(window.__REDUX_STORE__);
+      }
+    }
+    
+    // Update previous auth state
+    setPrevAuthState(isAuthenticated);
+  }, [isAuthenticated, user]);
   
   // Check authentication on mount
   useEffect(() => {
@@ -100,26 +121,38 @@ function MyApp({ Component, pageProps, emotionCache = clientSideEmotionCache }) 
       jssStyles.parentElement.removeChild(jssStyles);
     }
     
+    // Make store globally available for socket handler
+    window.__REDUX_STORE__ = store;
+    
     // Initialize UI state (dark mode, etc.)
     store.dispatch(initUI());
     
-    // Initialize socket connection
-    console.log('Initializing socket in _app.js');
-    socket = initializeSocket(store);
+    // Get user data for socket initialization
+    const userData = localStorage.getItem('user');
+    const tokenData = localStorage.getItem('token');
+    const isLoggedIn = !!tokenData && !!userData;
     
-    // Periodically check and reconnect socket if needed
-    const socketCheckInterval = setInterval(() => {
-      if (!socket || !socket.connected) {
-        console.log('Socket disconnected, attempting to reconnect');
-        socket = initializeSocket(store);
-      }
-    }, 10000); // Check every 10 seconds
-    
-    // Clean up socket on unmount
-    return () => {
-      clearInterval(socketCheckInterval);
-      disconnectSocket();
-    };
+    // Initialize socket connection if user is logged in
+    if (isLoggedIn) {
+      console.log('👤 User logged in, initializing socket in _app.js');
+      socket = initializeSocket(store);
+      
+      // Periodically check and reconnect socket if needed
+      const socketCheckInterval = setInterval(() => {
+        if (!socket || !socket.connected) {
+          console.log('🔄 Socket disconnected, attempting to reconnect');
+          socket = initializeSocket(store);
+        }
+      }, 5000); // Check every 5 seconds (increased frequency)
+      
+      // Clean up socket on unmount
+      return () => {
+        clearInterval(socketCheckInterval);
+        disconnectSocket();
+      };
+    } else {
+      console.log('⚠️ User not logged in, skipping socket initialization');
+    }
   }, []);
   
   // Create MUI theme
@@ -153,6 +186,7 @@ function MyApp({ Component, pageProps, emotionCache = clientSideEmotionCache }) 
             {/* Real-time notification component */}
             <div id="notifications-container">
               <RealTimeNotificationsWrapper />
+              <SocketHandler />
             </div>
           </AuthChecker>
         </ThemeProvider>

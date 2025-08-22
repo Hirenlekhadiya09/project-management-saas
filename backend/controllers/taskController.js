@@ -52,44 +52,65 @@ exports.createTask = async (req, res) => {
 
     // Notify assigned user if any
     if (req.body.assignedTo) {
-      // Create in-app notification
-      const project = await Project.findById(req.body.project, 'name');
-      const notification = await Notification.create({
-        type: 'task_assigned',
-        title: 'New task assigned',
-        message: `You have been assigned to task: "${task.title}" in project "${project.name}" with ${task.priority} priority${task.dueDate ? ` due by ${new Date(task.dueDate).toLocaleDateString()}` : ''}`,
-        recipient: req.body.assignedTo,
-        sender: req.user.id,
-        relatedResource: {
-          resourceType: 'task',
-          resourceId: task._id
-        },
-        tenantId: req.user.tenantId
-      });
-      
-      // Get the assigned user for inclusion in socket event
-      const assignedUser = await User.findById(req.body.assignedTo).select('name email avatar');
-      
-      // Emit socket event for real-time notification
-      const io = req.app.get('io');
-      
-      // Enable debugging to see socket events
-      console.log(`Emitting notification to user:${req.body.assignedTo}`);
-      
-      // Send directly to user-specific room
-      const userRoom = `user:${req.body.assignedTo}`;
-      console.log(`[NOTIFICATION DEBUG] Emitting task-assigned notification to user room: ${userRoom}`);
-      
-      // Emit notification event to user's room
-      io.to(userRoom).emit('notification', {
-        ...notification.toObject(),
-        sender: {
-          _id: req.user.id,
-          name: req.user.name,
-          avatar: req.user.avatar
-        },
-        recipient: req.body.assignedTo // Include recipient ID so client can filter
-      });
+      try {
+        // Create in-app notification
+        const project = await Project.findById(req.body.project, 'name');
+        const notification = await Notification.create({
+          type: 'task_assigned',
+          title: 'New task assigned',
+          message: `You have been assigned to task: "${task.title}" in project "${project.name}" with ${task.priority} priority${task.dueDate ? ` due by ${new Date(task.dueDate).toLocaleDateString()}` : ''}`,
+          recipient: req.body.assignedTo,
+          sender: req.user.id,
+          relatedResource: {
+            resourceType: 'task',
+            resourceId: task._id
+          },
+          tenantId: req.user.tenantId
+        });
+        
+        // Get the assigned user for inclusion in socket event
+        const assignedUser = await User.findById(req.body.assignedTo).select('name email avatar');
+        
+        // Emit socket event for real-time notification
+        const io = req.app.get('io');
+        
+        // Get all connected sockets
+        const connectedSockets = await io.fetchSockets();
+        console.log(`🌐 Total connected sockets: ${connectedSockets.length}`);
+        
+        // Enable debugging to see socket events
+        console.log(`📩 Emitting notification to user:${req.body.assignedTo}`);
+        
+        // Find all sockets with this user ID
+        const userSockets = connectedSockets.filter(s => s.userId === req.body.assignedTo);
+        console.log(`👤 Found ${userSockets.length} socket(s) for user ${req.body.assignedTo}`);
+        
+        // Send directly to user-specific room and to each user socket
+        const userRoom = `user:${req.body.assignedTo}`;
+        console.log(`📬 [NOTIFICATION] Emitting to user room: ${userRoom}`);
+        
+        // Create notification payload
+        const notificationPayload = {
+          ...notification.toObject(),
+          sender: {
+            _id: req.user.id,
+            name: req.user.name,
+            avatar: req.user.avatar
+          },
+          recipient: req.body.assignedTo
+        };
+        
+        // Emit to room first
+        io.to(userRoom).emit('notification', notificationPayload);
+        
+        // Also emit directly to each socket for this user (belt and suspenders approach)
+        userSockets.forEach(socket => {
+          console.log(`📨 Direct emission to socket ${socket.id} for user ${req.body.assignedTo}`);
+          socket.emit('notification', notificationPayload);
+        });
+      } catch (err) {
+        console.error('❌ Error sending notification:', err);
+      }
       
       // Also emit task-assigned event specifically for task assignments
       io.to(userRoom).emit('task-assigned', {

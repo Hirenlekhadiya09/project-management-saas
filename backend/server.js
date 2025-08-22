@@ -43,7 +43,7 @@ const io = socketIo(server, {
     },
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
     credentials: true,
-    allowedHeaders: ['Content-Type', 'Authorization', 'x-tenant-id', 'Origin', 'X-Requested-With', 'Accept']
+    allowedHeaders: ['Content-Type', 'Authorization', 'x-tenant-id', 'x-user-id', 'Origin', 'X-Requested-With', 'Accept']
   },
   transports: ['websocket', 'polling']
 });
@@ -134,16 +134,34 @@ app.set('io', io);
 
 // Socket.io connection
 io.on('connection', (socket) => {
-  console.log('New client connected with ID:', socket.id);
+  console.log('🔌 New client connected with ID:', socket.id);
+  
+  // Check for user ID in handshake
+  const userId = socket.handshake.headers['x-user-id'] || socket.handshake.query.userId;
+  if (userId) {
+    console.log(`👤 User ID detected in connection: ${userId}`);
+    socket.userId = userId;
+    
+    // Automatically join user to their room
+    const userRoom = `user:${userId}`;
+    socket.join(userRoom);
+    console.log(`🚪 Auto-joined user room: ${userRoom}`);
+    
+    // Send immediate test notification to verify connection
+    socket.emit('test-notification', {
+      message: `Socket connected for user ${userId.substr(0, 6)}...`,
+      time: new Date().toISOString()
+    });
+  }
   
   // Debug all socket events for development
   const debugSocketEvent = (event, data) => {
-    console.log(`Socket event '${event}' received:`, JSON.stringify(data));
+    console.log(`📡 Socket event '${event}' received:`, JSON.stringify(data));
   };
   
   // Debug middleware to log all events
   socket.onAny((event, ...args) => {
-    console.log(`Socket event received: ${event}`, args);
+    console.log(`📥 Socket event received: ${event}`, args);
   });
   
   socket.on('join-tenant', (tenantId) => {

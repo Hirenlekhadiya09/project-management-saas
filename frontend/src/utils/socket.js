@@ -7,13 +7,35 @@ import { showNotification } from '../features/ui/uiSlice';
 let socket;
 
 export const initializeSocket = (store) => {
-  console.log("Initializing socket connection");
+  console.log("🔌 Initializing socket connection");
   const SOCKET_URL = process.env.NEXT_PUBLIC_SOCKET_URL || 'http://localhost:5000';
   
   // Close existing socket if any
   if (socket) {
+    console.log("Disconnecting existing socket");
     socket.disconnect();
   }
+  
+  // Get current user ID before initializing socket
+  const currentState = store.getState();
+  const currentUser = currentState?.auth?.user;
+  const userIdFromRedux = currentUser?._id;
+  
+  // Try to get user ID from localStorage as backup
+  let userIdFromStorage = null;
+  try {
+    const userData = localStorage.getItem('user');
+    if (userData) {
+      const parsedUser = JSON.parse(userData);
+      userIdFromStorage = parsedUser?._id;
+    }
+  } catch (e) {
+    console.error("Error parsing user from localStorage", e);
+  }
+  
+  // Use Redux user ID if available, otherwise localStorage
+  const userId = userIdFromRedux || userIdFromStorage;
+  console.log(`🔑 User ID for socket connection: ${userId || 'Not found'}`);
   
   socket = io(SOCKET_URL, {
     withCredentials: true,
@@ -23,9 +45,13 @@ export const initializeSocket = (store) => {
     autoConnect: true,
     reconnection: true,
     extraHeaders: {
-      'x-tenant-id': localStorage.getItem('tenantId') || ''
+      'x-tenant-id': localStorage.getItem('tenantId') || '',
+      'x-user-id': userId || ''  // Add user ID in headers for easier authentication
     },
-    timeout: 10000
+    timeout: 10000,
+    query: {
+      userId: userId  // Also include in query for servers that prefer query params
+    }
   });
   // Listen for connect event
   socket.on('connect', () => {
