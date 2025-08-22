@@ -165,34 +165,48 @@ export const initializeSocket = (store) => {
         const taskId = data.task?._id;
         
         if (taskId) {
-          console.log('Showing task assignment notification');
+          console.log('Checking for existing task assignment notifications');
           
-          // Add to notifications collection
-          const notificationData = {
-            _id: new Date().getTime().toString(),
-            type: 'task_assigned',
-            title: 'Task assigned to you',
-            message: `Task "${taskTitle}" was assigned to you`,
-            read: false,
-            createdAt: new Date().toISOString(),
-            relatedResource: {
-              resourceType: 'task',
-              resourceId: taskId
-            }
-          };
+          // Check if a notification for this task already exists
+          const existingNotifications = store.getState().notifications.notifications;
+          const isDuplicate = existingNotifications.some(
+            n => (n.relatedResource?.resourceId === taskId && 
+                 n.type === 'task_assigned' && 
+                 Date.now() - new Date(n.createdAt).getTime() < 30000) // within 30 seconds
+          );
           
-          // Add to notifications collection
-          store.dispatch(addNotification(notificationData));
-          
-          // Show toast notification
-          store.dispatch(showNotification({
-            message: `Task "${taskTitle}" was assigned to you`,
-            type: 'info',
-            relatedResource: {
-              resourceType: 'task',
-              resourceId: taskId
-            }
-          }));
+          if (!isDuplicate) {
+            console.log('Showing task assignment notification');
+            
+            // Add to notifications collection
+            const notificationData = {
+              _id: `task-assignment-${taskId}-${Date.now()}`, // Unique ID
+              type: 'task_assigned',
+              title: 'Task assigned to you',
+              message: `Task "${taskTitle}" was assigned to you`,
+              read: false,
+              createdAt: new Date().toISOString(),
+              relatedResource: {
+                resourceType: 'task',
+                resourceId: taskId
+              }
+            };
+            
+            // Add to notifications collection
+            store.dispatch(addNotification(notificationData));
+            
+            // Show toast notification
+            store.dispatch(showNotification({
+              message: `Task "${taskTitle}" was assigned to you`,
+              type: 'info',
+              relatedResource: {
+                resourceType: 'task',
+                resourceId: taskId
+              }
+            }));
+          } else {
+            console.log('Duplicate task assignment notification, ignoring');
+          }
         }
       }
     } catch (error) {
@@ -241,22 +255,39 @@ export const initializeSocket = (store) => {
       
       console.log('✓ Is notification for current user:', isForCurrentUser);
       
-      // Always show notification during debugging to see what's happening
-      console.log('💬 Processing notification: ', data.title || data.message);
-      
-      // Add to notifications collection in Redux
-      store.dispatch(addNotification({
-        ...data,
-        _id: data._id || new Date().getTime().toString() // Ensure we have an ID
-      }));
-      
-      // Show toast notification
-      store.dispatch(showNotification({
-        message: data.title || data.message || 'New notification',
-        type: 'info',
-        relatedResource: data.relatedResource || null,
-        duration: 8000 // Show for 8 seconds to make sure it's seen
-      }));
+      // Only process notifications for this user
+      if (isForCurrentUser) {
+        console.log('💬 Processing notification: ', data.title || data.message);
+        
+        // Check if notification with same ID already exists to prevent duplicates
+        const existingNotifications = store.getState().notifications.notifications;
+        const isDuplicate = existingNotifications.some(
+          n => n._id === data._id || 
+              (n.relatedResource?.resourceId === data.relatedResource?.resourceId && 
+               n.type === data.type && 
+               Date.now() - new Date(n.createdAt).getTime() < 10000) // within 10 seconds
+        );
+        
+        if (!isDuplicate) {
+          // Add to notifications collection in Redux
+          store.dispatch(addNotification({
+            ...data,
+            _id: data._id || new Date().getTime().toString() // Ensure we have an ID
+          }));
+          
+          // Show toast notification
+          store.dispatch(showNotification({
+            message: data.title || data.message || 'New notification',
+            type: 'info',
+            relatedResource: data.relatedResource || null,
+            duration: 8000 // Show for 8 seconds to make sure it's seen
+          }));
+        } else {
+          console.log('🚫 Duplicate notification detected, ignoring');
+        }
+      } else {
+        console.log('🚫 Notification not for current user, ignoring');
+      }
     } catch (error) {
       console.error('❌ Error handling notification event:', error);
     }
