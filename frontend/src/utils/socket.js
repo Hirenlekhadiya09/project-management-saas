@@ -96,20 +96,49 @@ export const initializeSocket = (store) => {
       console.log('Current user ID:', currentUserId);
       console.log('Task assigned to:', data?.assignedTo);
       
-      // Always show notification for testing
-      const taskTitle = data.task?.title || 'New task';
-      const taskId = data.task?._id;
+      // Check if this task is assigned to the current user
+      const isAssignedToCurrentUser = 
+        data?.assignedTo === currentUserId || 
+        data.task?.assignedTo === currentUserId ||
+        data.task?.assignedTo?._id === currentUserId;
       
-      if (taskId) {
-        console.log('Showing task assignment notification');
-        store.dispatch(showNotification({
-          message: `Task "${taskTitle}" was assigned to you`,
-          type: 'info',
-          relatedResource: {
-            resourceType: 'task',
-            resourceId: taskId
-          }
-        }));
+      console.log('Is assigned to current user:', isAssignedToCurrentUser);
+      
+      // Only show notification if task is assigned to current user
+      if (isAssignedToCurrentUser) {
+        const taskTitle = data.task?.title || 'New task';
+        const taskId = data.task?._id;
+        
+        if (taskId) {
+          console.log('Showing task assignment notification');
+          
+          // Add to notifications collection
+          const notificationData = {
+            _id: new Date().getTime().toString(),
+            type: 'task_assigned',
+            title: 'Task assigned to you',
+            message: `Task "${taskTitle}" was assigned to you`,
+            read: false,
+            createdAt: new Date().toISOString(),
+            relatedResource: {
+              resourceType: 'task',
+              resourceId: taskId
+            }
+          };
+          
+          // Add to notifications collection
+          store.dispatch(addNotification(notificationData));
+          
+          // Show toast notification
+          store.dispatch(showNotification({
+            message: `Task "${taskTitle}" was assigned to you`,
+            type: 'info',
+            relatedResource: {
+              resourceType: 'task',
+              resourceId: taskId
+            }
+          }));
+        }
       }
     } catch (error) {
       console.error('Error handling task-assigned event:', error);
@@ -142,18 +171,29 @@ export const initializeSocket = (store) => {
       console.log('Current user ID:', currentUserId);
       console.log('Notification recipient:', data?.recipient);
       
-      // Add notification regardless to make sure it works
-      if (data) {
+      // Check if notification is for current user
+      const isForCurrentUser = 
+        data?.recipient === currentUserId || 
+        data?.recipient?._id === currentUserId;
+      
+      console.log('Is notification for current user:', isForCurrentUser);
+      
+      // Only process notifications meant for this user
+      if (isForCurrentUser || !data.recipient) {
+        console.log('Processing notification for current user');
+        
         // Add to notifications collection in Redux
         store.dispatch(addNotification(data));
         
-        // Always show toast notification for debugging
+        // Show toast notification
         console.log('Showing notification:', data.title || data.message);
         store.dispatch(showNotification({
           message: data.title || data.message || 'New notification',
           type: 'info',
           relatedResource: data.relatedResource || null
         }));
+      } else {
+        console.log('Ignoring notification not intended for current user');
       }
     } catch (error) {
       console.error('Error handling notification event:', error);

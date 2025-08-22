@@ -58,6 +58,7 @@ const NotificationsMenu = ({ anchorEl, open, onClose }) => {
     
     // Mark as read
     if (!notification.read) {
+      console.log(`Marking notification ${notification._id} as read`);
       dispatch(markAsRead([notification._id]));
     }
     
