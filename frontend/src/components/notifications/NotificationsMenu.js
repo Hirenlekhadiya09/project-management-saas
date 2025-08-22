@@ -33,7 +33,7 @@ import { formatDistanceToNow } from 'date-fns';
 const NotificationsMenu = ({ anchorEl, open, onClose }) => {
   const dispatch = useDispatch();
   const router = useRouter();
-  const { notifications, isLoading, unreadCount } = useSelector((state) => state.notifications);
+  const { notifications, isLoading, unreadCount, error } = useSelector((state) => state.notifications);
   const [selectedId, setSelectedId] = useState(null);
   
   const handleRefresh = () => {
@@ -57,9 +57,17 @@ const NotificationsMenu = ({ anchorEl, open, onClose }) => {
   
   const handleClearAll = async () => {
     if (window.confirm('Are you sure you want to clear all notifications?')) {
-      setClearingAll(true);
-      await dispatch(clearAllNotifications());
-      setClearingAll(false);
+      try {
+        setClearingAll(true);
+        await dispatch(clearAllNotifications()).unwrap();
+        // Show success message
+        console.log('Notifications cleared successfully');
+      } catch (error) {
+        console.error('Failed to clear notifications:', error);
+        alert('Failed to clear notifications: ' + (error.message || 'Unknown error'));
+      } finally {
+        setClearingAll(false);
+      }
     }
   };
   
@@ -80,24 +88,38 @@ const NotificationsMenu = ({ anchorEl, open, onClose }) => {
         
         // Make sure resourceId exists before navigating
         if (resourceId) {
+          // Use router.prefetch to check if the page exists
           if (resourceType === 'task') {
-            router.push(`/tasks/${resourceId}`);
+            router.push(`/tasks/${resourceId}`).catch(() => {
+              console.error('Task not found or access denied');
+              alert('This task may have been deleted or you no longer have access to it.');
+            });
           } else if (resourceType === 'project') {
-            router.push(`/projects/${resourceId}`);
+            router.push(`/projects/${resourceId}`).catch(() => {
+              console.error('Project not found or access denied');
+              alert('This project may have been deleted or you no longer have access to it.');
+            });
           } else if (resourceType === 'user') {
-            router.push(`/team/${resourceId}`);
+            router.push(`/team/${resourceId}`).catch(() => {
+              console.error('User not found or access denied');
+              alert('This user profile may have been deleted or you no longer have access to it.');
+            });
           }
         } else {
           console.error('Missing resourceId in notification:', notification);
+          // Show notification content anyway if resourceId is missing
+          alert(`Notification: ${notification.message || 'No message provided'}`);
         }
       } else {
         // If there's no related resource, just acknowledge the notification
         console.log('Notification has no related resource to navigate to');
+        // Show notification content anyway
+        alert(`Notification: ${notification.message || 'No message provided'}`);
       }
     } catch (error) {
       console.error('Error navigating from notification:', error);
-      // Show a user-friendly error message
-      alert('Unable to open the related item. It may have been deleted or moved.');
+      // Show a user-friendly error message with more information
+      alert(`Unable to open the related item. ${error.message || 'It may have been deleted or moved.'}`);
     }
   };
   
@@ -159,13 +181,21 @@ const NotificationsMenu = ({ anchorEl, open, onClose }) => {
         <Box sx={{ display: 'flex', justifyContent: 'center', p: 2 }}>
           <CircularProgress size={24} />
         </Box>
-      ) : notifications.length > 0 ? (
+      ) : error ? (
+        <Box sx={{ p: 2, textAlign: 'center', color: 'error.main' }}>
+          <Typography>Error loading notifications</Typography>
+          <Typography variant="body2">{error}</Typography>
+          <Button sx={{ mt: 1 }} variant="outlined" size="small" onClick={handleRefresh}>
+            Retry
+          </Button>
+        </Box>
+      ) : notifications && notifications.length > 0 ? (
         <>
-          {notifications.map((notification) => (
+          {notifications.map((notification, index) => (
             <MenuItem
-              key={notification._id}
-              onClick={() => handleNavigate(notification)}
-              selected={notification._id === selectedId}
+              key={notification._id || `notification-${index}`}
+              onClick={() => notification && handleNavigate(notification)}
+              selected={notification && notification._id === selectedId}
               sx={{
                 backgroundColor: notification.read ? 'transparent' : 'rgba(25, 118, 210, 0.08)',
                 borderLeft: notification.read ? 'none' : '4px solid #1890ff',

@@ -32,11 +32,12 @@ import {
   Brightness4,
   Brightness7,
   ChevronLeft,
+  DeleteOutline as DeleteIcon,
 } from '@mui/icons-material';
 
 import { toggleSidebar, setSidebarState, toggleDarkMode } from '../../features/ui/uiSlice';
 import { logout } from '../../features/auth/authSlice';
-import { getNotifications } from '../../features/notifications/notificationSlice';
+import { getNotifications, clearAllNotifications } from '../../features/notifications/notificationSlice';
 import NotificationsMenu from '../notifications/NotificationsMenu';
 
 const drawerWidth = 240;
@@ -61,16 +62,19 @@ const DashboardLayout = ({ children }) => {
       dispatch(setSidebarState(false));
     }
     
-    // Get notifications
-    dispatch(getNotifications());
-    
-    // Set up notification polling interval
-    const interval = setInterval(() => {
+    // Only fetch notifications if user is logged in
+    if (user && user.id) {
+      // Get notifications
       dispatch(getNotifications());
-    }, 60000); // Every minute
-    
-    return () => clearInterval(interval);
-  }, [dispatch, isMobile]);
+      
+      // Set up notification polling interval
+      const interval = setInterval(() => {
+        dispatch(getNotifications());
+      }, 60000); // Every minute
+      
+      return () => clearInterval(interval);
+    }
+  }, [dispatch, isMobile, user]);
   
   const handleProfileMenuOpen = (event) => {
     setAnchorEl(event.currentTarget);
@@ -86,6 +90,13 @@ const DashboardLayout = ({ children }) => {
   
   const handleNotificationsClose = () => {
     setNotificationsAnchor(null);
+  };
+  
+  const handleClearNotifications = () => {
+    if (window.confirm('Are you sure you want to clear all notifications?')) {
+      dispatch(clearAllNotifications());
+      // Don't close the notification menu to let user see the changes
+    }
   };
   
   const handleLogout = () => {
@@ -191,16 +202,32 @@ const DashboardLayout = ({ children }) => {
           </IconButton>
           
           {/* Notifications */}
-          <IconButton
-            color="inherit"
-            aria-label="notifications"
-            aria-haspopup="true"
-            onClick={handleNotificationsOpen}
-          >
-            <Badge badgeContent={unreadCount} color="error">
-              <NotificationsIcon />
-            </Badge>
-          </IconButton>
+          <Box sx={{ display: 'flex', alignItems: 'center' }}>
+            <IconButton
+              color="inherit"
+              aria-label="notifications"
+              aria-haspopup="true"
+              onClick={handleNotificationsOpen}
+              title="View notifications"
+            >
+              <Badge badgeContent={unreadCount} color="error">
+                <NotificationsIcon />
+              </Badge>
+            </IconButton>
+            
+            {unreadCount > 0 && (
+              <IconButton
+                color="inherit"
+                aria-label="clear-notifications"
+                onClick={handleClearNotifications}
+                title="Clear all notifications"
+                size="small"
+                sx={{ ml: 0.5 }}
+              >
+                <DeleteIcon fontSize="small" />
+              </IconButton>
+            )}
+          </Box>
           
           {/* User menu */}
           <IconButton
