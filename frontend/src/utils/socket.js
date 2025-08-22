@@ -26,6 +26,19 @@ export const initializeSocket = (store) => {
     if (tenantId) {
       socket.emit('join-tenant', tenantId);
     }
+    
+    // Join user-specific room
+    const userData = localStorage.getItem('user');
+    if (userData) {
+      try {
+        const user = JSON.parse(userData);
+        if (user && user._id) {
+          socket.emit('join-user-room', user._id);
+        }
+      } catch (err) {
+        console.error('Error parsing user data for socket room:', err);
+      }
+    }
   });
   
   socket.on('disconnect', () => {
@@ -46,11 +59,20 @@ export const initializeSocket = (store) => {
       store.dispatch(updateLocalTask(data.task));
     }
     
-    // Show notification for the assignment
-    store.dispatch(showNotification({
-      message: `Task "${data.task.title}" was assigned to you`,
-      type: 'info'
-    }));
+    // Get current user ID from store
+    const currentUserId = store.getState().auth.user?._id;
+    
+    // Only show notification if the current user is the assignee
+    if (currentUserId && data.assignedTo && data.assignedTo._id === currentUserId) {
+      store.dispatch(showNotification({
+        message: `Task "${data.task.title}" was assigned to you`,
+        type: 'info',
+        relatedResource: {
+          resourceType: 'task',
+          resourceId: data.task._id
+        }
+      }));
+    }
   });
   
   socket.on('project-updated', (data) => {
@@ -65,12 +87,19 @@ export const initializeSocket = (store) => {
   });
   
   socket.on('notification', (data) => {
-    store.dispatch(addNotification(data));
+    // Get current user ID from store
+    const currentUserId = store.getState().auth.user?._id;
     
-    store.dispatch(showNotification({
-      message: data.title,
-      type: 'info'
-    }));
+    // Only add notification if it's meant for the current user
+    if (currentUserId && data.recipient === currentUserId) {
+      store.dispatch(addNotification(data));
+      
+      store.dispatch(showNotification({
+        message: data.title,
+        type: 'info',
+        relatedResource: data.relatedResource
+      }));
+    }
   });
   
   return socket;

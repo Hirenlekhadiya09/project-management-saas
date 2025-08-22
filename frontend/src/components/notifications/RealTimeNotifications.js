@@ -9,7 +9,7 @@ import { useRouter } from 'next/router';
 const RealTimeNotifications = () => {
   const dispatch = useDispatch();
   const router = useRouter();
-  const { notification, open } = useSelector((state) => state.ui.notification);
+  const { notification, open } = useSelector((state) => state.ui.notification || { notification: null, open: false });
   
   const handleClose = (event, reason) => {
     if (reason === 'clickaway') {
@@ -31,13 +31,17 @@ const RealTimeNotifications = () => {
     dispatch(hideNotification());
   };
 
+  if (!notification || typeof notification !== 'object') {
+    return null;
+  }
+  
   return (
     <Snackbar
       anchorOrigin={{
         vertical: 'bottom',
         horizontal: 'right',
       }}
-      open={open}
+      open={Boolean(open)}
       autoHideDuration={6000}
       onClose={handleClose}
       action={

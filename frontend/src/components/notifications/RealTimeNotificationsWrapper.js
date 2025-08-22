@@ -1,12 +1,20 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useSelector } from 'react-redux';
 import RealTimeNotifications from './RealTimeNotifications';
 
 // This is a wrapper component that will only render in client-side
 const RealTimeNotificationsWrapper = () => {
-  const { isAuthenticated } = useSelector((state) => state.auth);
+  const { isAuthenticated, user } = useSelector((state) => state.auth);
+  const [isMounted, setIsMounted] = useState(false);
   
-  if (!isAuthenticated) {
+  // Use useEffect for client-side rendering
+  useEffect(() => {
+    setIsMounted(true);
+    return () => setIsMounted(false);
+  }, []);
+  
+  // Only render on client-side and when authenticated
+  if (!isMounted || !isAuthenticated || !user) {
     return null;
   }
   
